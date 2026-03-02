@@ -9,6 +9,8 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+*/.venv/
+*/venv/
 *.egg-info/
 *.egg
 dist/
