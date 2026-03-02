@@ -1,0 +1,28 @@
+# Environment and secrets (never commit)
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+*.egg-info/
+*.egg
+dist/
+build/
+
+# IDE and OS
+.DS_Store
+.idea/
+*:Zone.Identifier
+*.swp
+*.swo
+
+# Project-specific
+.ipynb_checkpoints/
+*.pytest_cache/
+.ruff_cache/
+weaviate_data/

@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.DS_Store
+.ipynb_checkpoints/
+backend/.pytest_cache/
+backend/.ruff_cache/
+backend/dist/
+backend/build/
+weaviate_data/
