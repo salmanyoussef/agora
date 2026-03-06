@@ -15,12 +15,13 @@ class AzureEmbeddingClient:
     azure_endpoint: str
     api_key: str
     deployment: str
+    api_version: str
 
     def __post_init__(self) -> None:
         self.client = AzureOpenAI(
             azure_endpoint=self.azure_endpoint,
             api_key=self.api_key,
-            api_version="2024-02-01",
+            api_version=self.api_version,
         )
 
     def _log_usage(self, resp: Any, batch_size: int) -> None:

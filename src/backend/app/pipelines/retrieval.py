@@ -32,6 +32,7 @@ def ingest_data_gouv(
         azure_endpoint=settings.azure_openai_endpoint,
         api_key=settings.azure_openai_api_key,
         deployment=settings.azure_openai_embed_deployment,
+        api_version=settings.azure_openai_embed_api_version,
     )
     store = WeaviateStore()
 
@@ -93,6 +94,7 @@ def search_datasets(embedded_query_text: str, k: int = 5):
         azure_endpoint=settings.azure_openai_endpoint,
         api_key=settings.azure_openai_api_key,
         deployment=settings.azure_openai_embed_deployment,
+        api_version=settings.azure_openai_embed_api_version,
     )
     q_emb = emb_client.embed_texts([embedded_query_text])[0]
 
