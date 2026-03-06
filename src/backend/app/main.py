@@ -4,7 +4,8 @@ from fastapi import FastAPI
 import logging
 from pydantic import BaseModel, Field
 
-from app.pipelines.retrieval import ingest_data_gouv, search_datasets
+from app.pipelines.retrieval import ingest_data_gouv
+from app.agents.orchestrator import AgentOrchestrator
 
 from app.weaviate.store import WeaviateStore
 
@@ -59,10 +60,12 @@ def ingest(req: IngestRequest):
 
 @app.post("/search")
 def search(req: SearchRequest):
-    logger.info("HTTP /search called: k=%d", req.k)
-    hits = search_datasets(req.question, k=req.k)
-    logger.info("HTTP /search completed: hits=%d", len(hits))
-    return {"hits": hits}
+
+    orchestrator = AgentOrchestrator()
+
+    result = orchestrator.run(req.question, k=req.k)
+
+    return result.model_dump()
 
 @app.get("/debug/count")
 def debug_count():

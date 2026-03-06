@@ -10,7 +10,7 @@ dependencies = [
   "weaviate-client>=4.20.1",
   "openai>=1.30",
   "tiktoken>=0.7",
-  "dspy-ai>=2.4.6",
+  "dspy-ai>=2.4.9",
 ]
 
 [tool.ruff]
