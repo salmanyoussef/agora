@@ -63,4 +63,15 @@ class PlannerAgent:
                 )
             )
 
-        return QueryPlan(intent=data.get("intent", question), subqueries=subs)
+        plan = QueryPlan(intent=data.get("intent", question), subqueries=subs)
+
+        logger.info("Planner intent: %s", plan.intent)
+        for s in plan.subqueries:
+            logger.info(
+                "Subquery created | %s | mode=%s",
+                s.question,
+                s.execution_mode,
+            )
+        logger.info("Planner completed")
+
+        return plan
