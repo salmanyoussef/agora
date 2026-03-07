@@ -45,4 +45,4 @@ Design: prototype in `notebooks/`, then refactor into production modules in `src
 
 ## License
 
-N/A
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
