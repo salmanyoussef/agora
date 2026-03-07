@@ -89,14 +89,14 @@ def ingest_data_gouv(
     return total_ingested
 
 
-def search_datasets(embedded_query_text: str, k: int = 5):
+def search_datasets(query_text: str, k: int = 5, alpha: float = 0.5):
     emb_client = AzureEmbeddingClient(
         azure_endpoint=settings.azure_openai_endpoint,
         api_key=settings.azure_openai_api_key,
         deployment=settings.azure_openai_embed_deployment,
         api_version=settings.azure_openai_embed_api_version,
     )
-    q_emb = emb_client.embed_texts([embedded_query_text])[0]
+    q_emb = emb_client.embed_texts([query_text])[0]
 
     store = WeaviateStore()
-    return store.search(q_emb, k=k)
+    return store.search(query_text=query_text, query_vector=q_emb, k=k, alpha=alpha)

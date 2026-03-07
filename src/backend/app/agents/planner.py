@@ -1,9 +1,11 @@
 import json
 import logging
+import time
+from datetime import datetime, timezone
 import dspy
 
 from app.models.plan import QueryPlan, SubQuery
-from app.services.dspy_setup import configure_dspy
+from app.services.dspy_setup import configure_dspy, log_last_lm_call
 
 logger = logging.getLogger(__name__)
 
@@ -11,11 +13,28 @@ logger = logging.getLogger(__name__)
 class PlanSignature(dspy.Signature):
 
     """
-    Break a user question into dataset retrieval subqueries.
-    Decide if each subquery requires RAG or numeric calculations.
+    You are planning retrieval queries for the French open government data portal.
+
+    Goal:
+    - Determine which datasets are relevant for answering the user question.
+    - Retrieval is done with a hybrid search (vector similarity + BM25).
+    - Your job is to produce one or more dataset-search-oriented subqueries.
+
+    Query planning rules:
+    - If the user question is broad and may require multiple dataset domains,
+      break it into focused subqueries that improve hybrid retrieval coverage.
+      Example broad question: "What is the feasibility of building a hotel in Lyon?"
+      Useful subquery themes could include tourism, infrastructure, roads, etc.
+    - If the user question is narrow/specific enough, do not decompose it.
+      Return exactly one subquery: either the original user question or a slight
+      reformulation optimized for hybrid dataset search.
+    - Keep subqueries concise, retrieval-ready, and aligned with data discovery.
     """
 
     question = dspy.InputField()
+    current_timestamp = dspy.InputField(
+        desc="Current UTC timestamp in ISO-8601 format. It's there for your reference."
+    )
 
     output_json = dspy.OutputField(
         desc="""
@@ -25,12 +44,15 @@ Return JSON with format:
  "intent": "...",
  "subqueries":[
    {
-    "question":"...",
-    "purpose":"...",
-    "execution_mode":"rag | technical"
+    "question":"A focused retrieval query for finding relevant French open data datasets (hybrid vector + BM25)",
+    "purpose":"Why this subquery is needed and what dataset angle/domain it covers"
    }
  ]
 }
+
+Important:
+- Return at least one subquery.
+- If decomposition is not needed, return exactly one subquery.
 """
     )
 
@@ -42,8 +64,17 @@ class PlannerAgent:
         self.module = dspy.ChainOfThought(PlanSignature)
 
     def run(self, question: str) -> QueryPlan:
-
-        result = self.module(question=question)
+        logger.info("PlannerAgent.run started: question_len=%d", len(question))
+        current_timestamp = datetime.now(timezone.utc).isoformat()
+        logger.info("PlannerAgent timestamp context: %s", current_timestamp)
+        logger.info("PlannerAgent LLM call started")
+        started_at = time.perf_counter()
+        result = self.module(question=question, current_timestamp=current_timestamp)
+        elapsed_ms = (time.perf_counter() - started_at) * 1000
+        logger.info("PlannerAgent LLM call completed in %.1f ms", elapsed_ms)
+        log_last_lm_call(caller="planner")
+        logger.info("PlannerAgent DSPy response trace (last call):")
+        dspy.inspect_history(n=1)
 
         try:
             data = json.loads(result.output_json)
@@ -59,7 +90,6 @@ class PlannerAgent:
                 SubQuery(
                     question=s.get("question", ""),
                     purpose=s.get("purpose", ""),
-                    execution_mode=s.get("execution_mode", "unknown"),
                 )
             )
 
@@ -67,11 +97,7 @@ class PlannerAgent:
 
         logger.info("Planner intent: %s", plan.intent)
         for s in plan.subqueries:
-            logger.info(
-                "Subquery created | %s | mode=%s",
-                s.question,
-                s.execution_mode,
-            )
+            logger.info("Subquery created | %s", s.question)
         logger.info("Planner completed")
 
         return plan

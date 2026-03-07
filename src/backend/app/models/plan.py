@@ -1,15 +1,12 @@
 from __future__ import annotations
 
-from typing import List, Literal
+from typing import List
 from pydantic import BaseModel, Field
-
-ExecutionMode = Literal["rag", "technical", "unknown"]
 
 
 class SubQuery(BaseModel):
     question: str
     purpose: str
-    execution_mode: ExecutionMode = "unknown"
 
 
 class QueryPlan(BaseModel):

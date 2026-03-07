@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import re
 import logging
+import re
+import time
 import requests
 from dataclasses import dataclass
 from typing import Any, Dict, Iterator, List, Optional
@@ -16,6 +17,8 @@ MAX_DESC_TOKENS = 7000
 
 
 logger = logging.getLogger(__name__)
+DEFAULT_RETRY_ATTEMPTS = 3
+DEFAULT_RETRY_BACKOFF_S = 1.5
 
 
 def _collapse_ws(s: str) -> str:
@@ -28,6 +31,17 @@ def truncate_desc_tokens(desc: str, max_tokens: int = MAX_DESC_TOKENS) -> str:
         return desc
     truncated = _TIKTOKEN_ENC.decode(tokens[:max_tokens])
     return truncated + " …"
+
+
+def extract_resource_urls(ds: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """From a dataset payload, return list of {url, resource} for each resource."""
+    out: List[Dict[str, Any]] = []
+    for res in ds.get("resources") or []:
+        u = res.get("url")
+        if not u:
+            continue
+        out.append({"url": u, "resource": res})
+    return out
 
 
 @dataclass
@@ -56,11 +70,50 @@ class DatasetRecord:
 
 
 class DataGouvDatasetsClient:
-    def __init__(self, base_url: str = DATASETS_URL, timeout_s: int = 60):
+    def __init__(
+        self,
+        base_url: str = DATASETS_URL,
+        timeout_s: int = 60,
+        retry_attempts: int = DEFAULT_RETRY_ATTEMPTS,
+        retry_backoff_s: float = DEFAULT_RETRY_BACKOFF_S,
+    ):
         self.base_url = base_url
         self.timeout_s = timeout_s
+        self.retry_attempts = max(1, retry_attempts)
+        self.retry_backoff_s = max(0.1, retry_backoff_s)
         self.session = requests.Session()
         self.session.headers.update({"Accept": "application/json"})
+
+    def _get_json_with_retry(self, url: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        last_exc: Exception | None = None
+        for attempt in range(1, self.retry_attempts + 1):
+            try:
+                resp = self.session.get(url, params=params, timeout=self.timeout_s)
+                resp.raise_for_status()
+                return resp.json()
+            except requests.RequestException as e:
+                last_exc = e
+                if attempt >= self.retry_attempts:
+                    break
+                delay = self.retry_backoff_s * (2 ** (attempt - 1))
+                logger.warning(
+                    "data.gouv request retry: attempt=%d/%d url=%s params=%s delay=%.1fs error=%s",
+                    attempt,
+                    self.retry_attempts,
+                    url,
+                    params,
+                    delay,
+                    e,
+                )
+                time.sleep(delay)
+        assert last_exc is not None
+        raise last_exc
+
+    def get_dataset(self, dataset_id: str) -> Dict[str, Any]:
+        """Fetch a single dataset by ID (full payload including resources)."""
+        url = f"{self.base_url.rstrip('/')}/{dataset_id}/"
+        logger.info("Fetching dataset: dataset_id=%s", dataset_id)
+        return self._get_json_with_retry(url)
 
     def fetch_page(
         self,
@@ -77,9 +130,7 @@ class DataGouvDatasetsClient:
             page_size,
             q,
         )
-        resp = self.session.get(self.base_url, params=params, timeout=self.timeout_s)
-        resp.raise_for_status()
-        return resp.json()
+        return self._get_json_with_retry(self.base_url, params=params)
 
     @staticmethod
     def _pick_str(d: Dict[str, Any], *keys: str) -> str:

@@ -114,16 +114,25 @@ class WeaviateStore:
         finally:
             client.close()
 
-    def search(self, query_vector: List[float], k: int = 5) -> List[Dict[str, Any]]:
+    def search(
+        self,
+        query_text: str,
+        query_vector: List[float],
+        k: int = 5,
+        alpha: float = 0.5,
+    ) -> List[Dict[str, Any]]:
         self.ensure_collection()
         client = self.connect()
         try:
-            logger.info("Weaviate search: k=%d", k)
+            logger.info("Weaviate hybrid search: k=%d, alpha=%.2f", k, alpha)
             col = client.collections.use(self.collection_name)
-            resp = col.query.near_vector(
-                near_vector=query_vector,
+            resp = col.query.hybrid(
+                query=query_text,
+                vector=query_vector,
+                alpha=alpha,
+                query_properties=["title", "description", "organization", "tags", "content"],
                 limit=k,
-                return_metadata=wvc.query.MetadataQuery(distance=True),
+                return_metadata=wvc.query.MetadataQuery(distance=True, score=True),
             )
 
             out: List[Dict[str, Any]] = []
@@ -134,6 +143,7 @@ class WeaviateStore:
                     {
                         **props,
                         "_distance": getattr(md, "distance", None),
+                        "_score": getattr(md, "score", None),
                     }
                 )
             logger.info("Weaviate search returned %d objects", len(out))
