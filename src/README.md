@@ -1,37 +1,46 @@
-# AGORA project
+# Agora — Application layer
 
-This repo is a starting point for migrating the Colab notebook workflow to a local, GitHub-friendly setup:
+Backend (FastAPI), frontend, and agent pipeline for French open data Q&A.
 
-- **Weaviate** runs locally in Docker (self-hosted).
-- **Backend** is FastAPI.
-- Embeddings are generated with **Azure OpenAI** (same as notebook) - specificaly the text-3-embeddings-small model.
-- Dataset vectors are **self-provided** (BYOV) - using the above mentioned embeddings model - and stored in Weaviate.
+- **Weaviate** runs locally in Docker (self-hosted); dataset metadata is embedded with **Azure OpenAI** (BYOV) and stored in Weaviate.
+- **Backend** is FastAPI; it runs a multi-step **agent pipeline**: planner → hybrid search → dataset selector → RAG or technical agent per dataset → synthesis.
+- **Streaming** and non-streaming search endpoints return a single, source-attributed answer.
 
 ## Quickstart
 
-1) Copy env example:
+1. Copy env example (from repo root):
 
 ```bash
 cp .env.example .env
 ```
 
-2) Start Weaviate:
+2. Start Weaviate:
 
 ```bash
 cd infra
 docker compose up -d
 ```
 
-3) Choose a backend setup (see below for **Dev** vs **Prod** flows).
+3. Choose a backend setup (see below for **Dev** vs **Prod** flows).
+
+## Agent pipeline (overview)
+
+1. **Planner** — Derives intent and subqueries from the user question.
+2. **Search** — Hybrid (vector + keyword) search over Weaviate for dataset hits.
+3. **Dataset selector** — Chooses which datasets to use and whether to run RAG or technical extraction.
+4. **RAG (general) or technical agent** — Per selected dataset: download resources, extract text; for RAG, chunk and embed with a shared Azure embedding client, retrieve top-k chunks, then generate an evidence block.
+5. **Synthesis** — Combines evidence (with `[Source: dataset]` labels) into one final answer in the same language as the question.
+
+Embeddings use a **shared singleton client** (`get_embedding_client()`) to avoid connection leaks; chat/synthesis uses DSPy with Azure OpenAI.
 
 ## Backend setup – development
 
 ### Option A: Backend in Docker (recommended for dev)
 
-From `src/backend`:
+From repo root:
 
 ```bash
-cd backend
+cd src/backend
 
 # Build image (uses pyproject.toml for deps)
 docker build -t agora-backend .
@@ -51,10 +60,10 @@ docker run --rm \
 
 ### Option B: Backend locally in a venv
 
-From `src/backend`:
+From repo root:
 
 ```bash
-cd backend
+cd src/backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -U pip
@@ -64,20 +73,30 @@ uvicorn app.main:app --reload
 
 ### Ingest + search (same for both dev options)
 
-In another terminal:
+In another terminal (from repo root):
 
 ```bash
-cd backend
+cd src/backend
 python scripts/ingest_data_gouv.py --mode single_page --page 1 --page-size 50
 ```
 
-Then test search:
+Then test **non-streaming** search:
 
 ```bash
 curl -X POST http://localhost:8000/search \
   -H "Content-Type: application/json" \
-  -d '{"question":"Je cherche des données sur la qualité de l\'air à Paris","k":5}'
+  -d '{"question":"Je cherche des données sur la qualité de l'\''air à Paris","k":5}'
 ```
+
+**Streaming** search (SSE: plan, status, user_message, done with full response):
+
+```bash
+curl -X POST http://localhost:8000/search/stream \
+  -H "Content-Type: application/json" \
+  -d '{"question":"Quels jeux de données sur la qualité de l'\''air à Paris ?","k":5}'
+```
+
+The frontend (see **`src/frontend/`**) uses the streaming endpoint and shows progress plus the final answer.
 
 ### Ingest the French data.gouv catalogue (15k sample vs full ~73k)
 
@@ -88,7 +107,7 @@ As of March 2026, data.gouv exposes **~73,000 datasets**. Embedding all of them 
 - **From a local venv** (backend running either locally or in Docker):
 
   ```bash
-  cd backend
+  cd src/backend
   python scripts/ingest_data_gouv.py \
     --mode all_pages \
     --page 1 \
@@ -99,7 +118,7 @@ As of March 2026, data.gouv exposes **~73,000 datasets**. Embedding all of them 
 - **From Docker only** (no local Python needed):
 
   ```bash
-  cd backend
+  cd src/backend
   docker run --rm \
     --env-file ../.env \
     -e WEAVIATE_URL=http://weaviate:8080 \
@@ -130,12 +149,28 @@ python -m streamlit run admin_gui/app.py
 
 The UI assumes `BACKEND_URL=http://localhost:8000` (override via env if needed).
 
+## Test scripts (backend)
+
+From `src/backend` (with venv active and Weaviate + backend running):
+
+- **Full pipeline** (one question → plan, search, select, RAG/technical, synthesis):
+
+  ```bash
+  python -m scripts.run_full_workflow_test "Quels jeux de données sur la qualité de l'air à Paris ?" --k 3
+  ```
+
+- **General (RAG) agent only** (subquery + dataset ID(s)):
+
+  ```bash
+  python -m scripts.run_general_agent_test "qualité de l'air Paris" --dataset-ids <id1> [id2 ...]
+  ```
+
 ## Backend setup – Production (Docker)
 
-From `src/backend`:
+From repo root:
 
 ```bash
-cd backend
+cd src/backend
 docker build -t agora-backend .
 
 docker run -d \
@@ -151,5 +186,5 @@ docker run -d \
 ## Notes
 
 - **Do not** commit `.env`.
-- If you previously used Neon/pgvector: this repo removes it entirely and replaces it with Weaviate.
-- requirements.txt is NOT BEING USED to build the backend docker image, but it remains in the project's backend/ directory to be used later if there is need for pinned versions.
+- Embeddings use a shared Azure client (`app.embeddings.azure.get_embedding_client()`) to avoid connection leaks.
+- Backend Docker image is built from `pyproject.toml`; `requirements.txt` is not used for the image but may be used for pinned versions later.

@@ -1,73 +1,48 @@
+# Agora
+
+**Agora** is a question-answering pipeline over French open government data ([data.gouv.fr](https://www.data.gouv.fr)). You ask a question in natural language; Agora plans subqueries, searches the dataset catalogue, selects relevant datasets, retrieves and extracts content (RAG or technical), and synthesizes a single, attributed answer.
 
 ---
 
-## 🔹 `src/` — Application Layer
+## What Agora does
 
-This directory contains the core application:
+- **Plan** — Splits your question into intent and subqueries.
+- **Search** — Hybrid (vector + keyword) search over indexed dataset metadata (Weaviate).
+- **Select** — Per-dataset choice of RAG vs technical extraction.
+- **Answer** — For each selected dataset: download resources, extract text, run RAG (chunk + embed + retrieve) or technical extraction, then **synthesize** one final answer with clear source attribution.
 
-- Backend services
-- API logic
-- Database integration
-- Embedding pipelines
-- Retrieval systems
-- Infrastructure configuration
-
-A detailed guide explaining how to run and configure the application is available here:
-
-👉 **`src/README.md`**
+Embeddings use **Azure OpenAI**; the chat/synthesis model is configured via DSPy (Azure OpenAI chat). Vectors are stored in **Weaviate** (self-hosted, BYOV).
 
 ---
 
-## 🔹 `notebooks/` — Research & Prototyping
+## Repository layout
 
-This directory contains:
+| Path | Description |
+|------|-------------|
+| **`src/`** | Application: backend (FastAPI), frontend, pipelines, agents, embeddings. See **`src/README.md`** for runbooks and API details. |
+| **`notebooks/`** | Research, prototyping, and experiments (embedding/retrieval, validation). |
 
-- Embedding experiments
-- Retrieval benchmarking
-- Data exploration
-- Early-stage prototypes
-- Model validation notebooks
-
-Notebooks are used to experiment and validate ideas before integrating them into the production system inside `src/`.
+Design: prototype in `notebooks/`, then refactor into production modules in `src/`, keeping a clear split between experimentation and deployment.
 
 ---
 
-## 🧠 Design Philosophy
+## Quick links
 
-AGORA follows a structured development workflow:
-
-1. Prototype ideas in `notebooks/`
-2. Validate experimentally
-3. Refactor into production-quality modules in `src/`
-4. Maintain clean separation between experimentation and deployment
-
-This ensures stability in production while preserving flexibility for research and iteration.
+- **Run the app, ingest, search, streaming:** [**`src/README.md`**](src/README.md)
+- **Backend-only quickref:** [**`src/backend/README.md`**](src/backend/README.md)
 
 ---
 
-## 🎯 Core Capabilities
+## Core capabilities
 
-- Semantic search via vector embeddings
-- Hybrid retrieval (vector + keyword)
-- Dataset metadata indexing
-- Modular backend architecture
-- Extensible embedding pipeline
-
----
-
-## 📌 Repository Purpose
-
-This repository contains both:
-
-- A deployable semantic search application (`src/`)
-- A research environment for continuous improvement (`notebooks/`)
-
-For execution instructions, environment setup, and deployment details, please refer to:
-
-👉 **`src/README.md`**
+- Semantic + keyword search over French open data catalogue
+- Multi-step agent pipeline (planner → search → selector → RAG/technical → synthesis)
+- Streaming progress and final answer via SSE
+- RAG with chunking, embedding-based retrieval, and per-resource fairness
+- Source-attributed synthesis (dataset/source labels in the answer)
 
 ---
 
-## 📄 License
+## License
 
 N/A
