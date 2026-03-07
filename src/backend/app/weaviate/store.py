@@ -130,7 +130,7 @@ class WeaviateStore:
                 query=query_text,
                 vector=query_vector,
                 alpha=alpha,
-                query_properties=["title", "description", "organization", "tags", "content"],
+                query_properties=["content"],
                 limit=k,
                 return_metadata=wvc.query.MetadataQuery(distance=True, score=True),
             )
