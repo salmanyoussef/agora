@@ -1,7 +1,29 @@
 """
 Download data.gouv resources and extract text for RAG.
-Mirrors the logic in notebooks/generate_questions_manual_w_gtfs_v1.1.ipynb:
-CSV, JSON/JSONL, TXT/MD, PDF, ZIP (GTFS), and GTFS-RT protobuf.
+
+Download: uses resource metadata (format/mime) from the API when available to set
+the file extension, then Content-Disposition, URL path, Content-Type, and finally
+content-based detection (filetype) so saved files have a proper extension.
+
+Extraction: with unstructured[all-docs] we attempt all types unstructured supports
+(.doc, .docx, .pdf, .xls, .xlsx, .csv, .tsv, .ppt, .pptx, .odt, .epub, .rtf, .rst,
+.md, .org, .html, .xml, .txt, .eml, .msg, and images). GTFS ZIP uses custom logic
+(static schedule .txt/.csv inside the archive). Other ZIP-based formats (e.g. XLSX,
+DOCX, EPUB, KMZ) are handled by saving with the correct extension from resource
+metadata so unstructured or fallbacks process them as single files; we do not
+unpack generic ZIPs of mixed documents here.
+
+Meaningful output:
+- Documents (PDF, Word, etc.) and spreadsheets: text is extracted and useful for RAG.
+- Images: meaningful only if OCR is available (e.g. tesseract; unstructured may use
+  it when the image extra is installed). Without OCR, image partition may return little.
+- Some formats (e.g. .odt, .rtf, .epub) may need system tools (pandoc, LibreOffice);
+  if missing, extraction can fail and we fall back to a short "[Unsupported...]" message.
+
+Weight of unstructured[all-docs]: pulls in many deps (e.g. PyTorch, opencv, pdfminer,
+pikepdf, python-pptx, python-docx, openpyxl, pypandoc, unstructured-inference). Install
+size and memory use are significant. For a lighter setup use a subset, e.g.
+unstructured[pdf,docx,xlsx,csv,html,xml,md,ppt,pptx,tsv,rtf].
 """
 from __future__ import annotations
 
@@ -22,6 +44,74 @@ from pypdf import PdfReader
 logger = logging.getLogger(__name__)
 DEFAULT_DOWNLOAD_RETRY_ATTEMPTS = 3
 DEFAULT_DOWNLOAD_RETRY_BACKOFF_S = 1.5
+
+# Map data.gouv resource "format" / mime to file extension (lowercase, with leading dot).
+# Used when the server does not provide a filename so we still save with the right extension.
+FORMAT_MIME_TO_EXT: Dict[str, str] = {
+    "csv": ".csv",
+    "application/csv": ".csv",
+    "text/csv": ".csv",
+    "json": ".json",
+    "application/json": ".json",
+    "geojson": ".geojson",
+    "application/geo+json": ".geojson",
+    "application/vnd.geo+json": ".geojson",
+    "jsonl": ".jsonl",
+    "ndjson": ".ndjson",
+    "application/jsonlines": ".jsonl",
+    "application/x-ndjson": ".ndjson",
+    "pdf": ".pdf",
+    "application/pdf": ".pdf",
+    "xlsx": ".xlsx",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
+    "xls": ".xls",
+    "application/vnd.ms-excel": ".xls",
+    "docx": ".docx",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "doc": ".doc",
+    "application/msword": ".doc",
+    "html": ".html",
+    "text/html": ".html",
+    "htm": ".htm",
+    "xml": ".xml",
+    "application/xml": ".xml",
+    "text/xml": ".xml",
+    "txt": ".txt",
+    "text/plain": ".txt",
+    "md": ".md",
+    "text/markdown": ".md",
+    "application/zip": ".zip",
+    "zip": ".zip",
+    "application/x-zip-compressed": ".zip",
+    "protobuf": ".pb",
+    "application/x-protobuf": ".pb",
+    "application/octet-stream": "",
+    "tsv": ".tsv",
+    "text/tab-separated-values": ".tsv",
+    "ppt": ".ppt",
+    "pptx": ".pptx",
+    "application/vnd.ms-powerpoint": ".ppt",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation": ".pptx",
+    "odt": ".odt",
+    "application/vnd.oasis.opendocument.text": ".odt",
+    "epub": ".epub",
+    "application/epub+zip": ".epub",
+    "rtf": ".rtf",
+    "application/rtf": ".rtf",
+    "text/rtf": ".rtf",
+    "rst": ".rst",
+    "text/x-rst": ".rst",
+    "org": ".org",
+    "eml": ".eml",
+    "message/rfc822": ".eml",
+    "msg": ".msg",
+    "application/vnd.ms-outlook": ".msg",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/tiff": ".tiff",
+    "image/bmp": ".bmp",
+    "image/heic": ".heic",
+}
 
 _CD_FILENAME_RE = re.compile(r'filename\*?=(?:UTF-8\'?\')?"?([^";]+)"?')
 
@@ -47,14 +137,60 @@ def _filename_from_url(url: str) -> Optional[str]:
     return base or None
 
 
+def _extension_from_resource(resource: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Infer file extension from data.gouv resource metadata (format, mime, extras)."""
+    if not resource:
+        return None
+    fmt = (resource.get("format") or "").strip().lower()
+    if fmt and fmt in FORMAT_MIME_TO_EXT:
+        return FORMAT_MIME_TO_EXT[fmt]
+    mime = (resource.get("mime") or "").strip().lower()
+    if mime:
+        # exact match
+        if mime in FORMAT_MIME_TO_EXT:
+            return FORMAT_MIME_TO_EXT[mime]
+        # without params (e.g. "application/vnd...; charset=utf-8")
+        base_mime = mime.split(";")[0].strip()
+        if base_mime in FORMAT_MIME_TO_EXT:
+            return FORMAT_MIME_TO_EXT[base_mime]
+    extras = resource.get("extras") or {}
+    analysis_mime = (extras.get("analysis:mime-type") or "").strip().lower()
+    if analysis_mime and analysis_mime in FORMAT_MIME_TO_EXT:
+        return FORMAT_MIME_TO_EXT[analysis_mime]
+    return None
+
+
+def _guess_extension_from_content(path: str) -> Optional[str]:
+    """Guess extension from file content (magic bytes). Returns e.g. '.pdf' or None."""
+    try:
+        import filetype
+    except ImportError:
+        return None
+    kind = filetype.guess(path)
+    if kind is None:
+        return None
+    ext = kind.extension
+    return f".{ext}" if ext and not ext.startswith(".") else (f".{ext}" if ext else None)
+
+
 def download_file(
     url: str,
     out_dir: str,
+    resource: Optional[Dict[str, Any]] = None,
     timeout_s: int = 60,
     retry_attempts: int = DEFAULT_DOWNLOAD_RETRY_ATTEMPTS,
     retry_backoff_s: float = DEFAULT_DOWNLOAD_RETRY_BACKOFF_S,
 ) -> str:
-    """Download URL to out_dir; return local path. Retries transient request errors."""
+    """
+    Download URL to out_dir; return local path. Retries transient request errors.
+
+    Filename/extension is chosen in this order:
+    1. Content-Disposition header (if present)
+    2. URL path
+    3. data.gouv resource metadata (format/mime) when resource= is provided
+    4. Content-Type header (mimetypes)
+    5. After download: content-based guess (filetype) if still no extension
+    """
     os.makedirs(out_dir, exist_ok=True)
 
     last_exc: Exception | None = None
@@ -78,10 +214,15 @@ def download_file(
 
                 root, ext = os.path.splitext(name)
                 if not ext:
-                    ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
-                    guessed_ext = mimetypes.guess_extension(ctype)
-                    if guessed_ext:
-                        name = root + guessed_ext
+                    # Prefer extension from data.gouv resource metadata
+                    res_ext = _extension_from_resource(resource)
+                    if res_ext:
+                        name = root + res_ext
+                    else:
+                        ctype = (r.headers.get("Content-Type") or "").split(";")[0].strip().lower()
+                        guessed_ext = mimetypes.guess_extension(ctype)
+                        if guessed_ext:
+                            name = root + guessed_ext
 
                 path_candidate = os.path.join(out_dir, name)
                 if os.path.exists(path_candidate):
@@ -96,6 +237,17 @@ def download_file(
                         if chunk:
                             f.write(chunk)
                 path = path_candidate
+
+                # If we still have no extension, guess from content (magic bytes)
+                root_final, ext_final = os.path.splitext(path)
+                if not ext_final or ext_final.lower() in (".bin", ".dat", ""):
+                    content_ext = _guess_extension_from_content(path)
+                    if content_ext:
+                        new_path = root_final + content_ext
+                        if new_path != path and not os.path.exists(new_path):
+                            os.rename(path, new_path)
+                            path = new_path
+                            logger.debug("download_file: renamed to %s using content guess", path)
             break
         except requests.RequestException as e:
             last_exc = e
@@ -129,185 +281,35 @@ def download_file(
     return path
 
 
-def _meta_text(resource: Optional[Dict[str, Any]]) -> str:
-    r = resource or {}
-    extras = r.get("extras") or {}
-    parts = [
-        str(r.get("format") or ""),
-        str(r.get("mime") or ""),
-        str(r.get("description") or ""),
-        str(extras.get("analysis:mime-type") or ""),
-    ]
-    return " ".join(parts).lower()
-
-
-def _looks_like_gtfs_rt(resource: Optional[Dict[str, Any]]) -> bool:
-    t = _meta_text(resource)
-    return any(
-        k in t
-        for k in ["gtfs-rt", "gtfsrt", "gtfs realtime", "realtime", "protobuf", "x-protobuf"]
-    )
-
-
-def extract_gtfs_rt_preview(path: str, max_entities: int = 50) -> str:
-    """Decode GTFS-RT protobuf into JSON preview. Requires gtfs-realtime-bindings."""
+def _extract_with_unstructured(path: str, max_chars: int = 200_000) -> Optional[str]:
+    """
+    Extract text using the unstructured library if available. Returns None if
+    the library is not installed, the format is not supported, or extraction fails.
+    """
     try:
-        from google.transit import gtfs_realtime_pb2
-    except Exception:
-        return (
-            "[GTFS-RT detected but decoder not installed]\n"
-            "Install: pip install gtfs-realtime-bindings protobuf"
-        )
-
-    with open(path, "rb") as f:
-        data = f.read()
-
-    feed = gtfs_realtime_pb2.FeedMessage()
-    feed.ParseFromString(data)
-
-    out: Dict[str, Any] = {
-        "header": {
-            "gtfs_realtime_version": feed.header.gtfs_realtime_version,
-            "incrementality": (
-                int(feed.header.incrementality) if feed.header.HasField("incrementality") else None
-            ),
-            "timestamp": (
-                int(feed.header.timestamp) if feed.header.HasField("timestamp") else None
-            ),
-        },
-        "entity_count": len(feed.entity),
-        "entities_preview": [],
-    }
-
-    for ent in feed.entity[:max_entities]:
-        e: Dict[str, Any] = {"id": ent.id or None}
-        if ent.is_deleted:
-            e["is_deleted"] = True
-
-        if ent.HasField("trip_update"):
-            tu = ent.trip_update
-            e["trip_update"] = {
-                "trip": {
-                    "trip_id": tu.trip.trip_id or None,
-                    "route_id": tu.trip.route_id or None,
-                    "direction_id": (
-                        tu.trip.direction_id if tu.trip.HasField("direction_id") else None
-                    ),
-                    "start_time": tu.trip.start_time or None,
-                    "start_date": tu.trip.start_date or None,
-                },
-                "vehicle": {
-                    "id": tu.vehicle.id or None,
-                    "label": tu.vehicle.label or None,
-                },
-                "timestamp": int(tu.timestamp) if tu.HasField("timestamp") else None,
-                "delay": int(tu.delay) if tu.HasField("delay") else None,
-                "stop_time_updates": [],
-            }
-            for stu in tu.stop_time_update[:50]:
-                e["trip_update"]["stop_time_updates"].append(
-                    {
-                        "stop_id": stu.stop_id or None,
-                        "arrival": (
-                            {
-                                "time": (
-                                    int(stu.arrival.time)
-                                    if stu.arrival.HasField("time")
-                                    else None
-                                ),
-                                "delay": (
-                                    int(stu.arrival.delay)
-                                    if stu.arrival.HasField("delay")
-                                    else None
-                                ),
-                            }
-                            if stu.HasField("arrival")
-                            else None
-                        ),
-                        "departure": (
-                            {
-                                "time": (
-                                    int(stu.departure.time)
-                                    if stu.departure.HasField("time")
-                                    else None
-                                ),
-                                "delay": (
-                                    int(stu.departure.delay)
-                                    if stu.departure.HasField("delay")
-                                    else None
-                                ),
-                            }
-                            if stu.HasField("departure")
-                            else None
-                        ),
-                    }
-                )
-
-        if ent.HasField("vehicle"):
-            vp = ent.vehicle
-            e["vehicle_position"] = {
-                "trip": (
-                    {
-                        "trip_id": vp.trip.trip_id or None,
-                        "route_id": vp.trip.route_id or None,
-                    }
-                    if vp.HasField("trip")
-                    else None
-                ),
-                "vehicle": (
-                    {
-                        "id": vp.vehicle.id or None,
-                        "label": vp.vehicle.label or None,
-                    }
-                    if vp.HasField("vehicle")
-                    else None
-                ),
-                "timestamp": int(vp.timestamp) if vp.HasField("timestamp") else None,
-                "position": {
-                    "latitude": (
-                        vp.position.latitude if vp.HasField("position") else None
-                    ),
-                    "longitude": (
-                        vp.position.longitude if vp.HasField("position") else None
-                    ),
-                    "bearing": (
-                        vp.position.bearing
-                        if vp.HasField("position") and vp.position.HasField("bearing")
-                        else None
-                    ),
-                    "speed": (
-                        vp.position.speed
-                        if vp.HasField("position") and vp.position.HasField("speed")
-                        else None
-                    ),
-                },
-                "current_status": (
-                    int(vp.current_status) if vp.HasField("current_status") else None
-                ),
-                "stop_id": vp.stop_id or None,
-            }
-
-        if ent.HasField("alert"):
-            al = ent.alert
-            e["alert"] = {
-                "cause": int(al.cause) if al.HasField("cause") else None,
-                "effect": int(al.effect) if al.HasField("effect") else None,
-                "header_text": (
-                    al.header_text.translation[0].text
-                    if al.header_text.translation
-                    else None
-                ),
-                "description_text": (
-                    al.description_text.translation[0].text
-                    if al.description_text.translation
-                    else None
-                ),
-            }
-
-        out["entities_preview"].append(e)
-
-    txt = json.dumps(out, ensure_ascii=False, indent=2)
-    return "[GTFS-RT decoded preview]\n" + txt[:200_000]
+        from unstructured.partition.auto import partition
+    except ImportError:
+        try:
+            from unstructured.partition.auto import partition_auto as partition
+        except ImportError:
+            logger.debug("unstructured not installed, skipping partition")
+            return None
+    try:
+        elements = partition(filename=path)
+    except Exception as e:
+        logger.debug("unstructured partition failed for %s: %s", path, e)
+        return None
+    if not elements:
+        return None
+    texts: List[str] = []
+    for el in elements:
+        t = getattr(el, "text", None) or str(el)
+        if t and t.strip():
+            texts.append(t.strip())
+    out = "\n\n".join(texts)
+    if len(out) > max_chars:
+        out = out[:max_chars] + "\n\n[Text truncated for length.]"
+    return out or None
 
 
 def _extract_gtfs_zip_docs(
@@ -373,19 +375,56 @@ def extract_text_from_file(
     resource: Optional[Dict[str, Any]] = None,
 ) -> Union[str, List[str]]:
     """
-    Extract text from a downloaded file for RAG. Handles CSV, JSON/JSONL, TXT/MD,
-    PDF, ZIP (GTFS), and .bin/.pb (GTFS-RT). Returns a single string or, for
-    GTFS ZIP, a list of strings (one per internal file).
+    Extract text from a downloaded file for RAG.
+
+    Supports: CSV, JSON/JSONL, TXT/MD, PDF, DOCX, XLSX, HTML, XML, ZIP (GTFS and
+    other ZIP-based formats by extension). Uses the unstructured library when
+    available for broad format support; falls back to pandas/pypdf/json for known types.
+    Returns a single string or, for GTFS ZIP, a list of strings (one per internal file).
     """
     lower = path.lower()
     logger.debug("extract_text_from_file: path=%s max_rows=%d", path, max_rows)
 
+    # Custom handling that must run first (GTFS ZIP, GTFS-RT)
+    if lower.endswith(".zip"):
+        r = resource or {}
+        extras = r.get("extras") or {}
+        fmt = str(r.get("format") or "")
+        mime = str(r.get("mime") or "")
+        desc = str(r.get("description") or "")
+        analysis_mime = str(extras.get("analysis:mime-type") or "")
+        combined = f"{fmt} {mime} {desc} {analysis_mime}".lower()
+        is_gtfs = "gtfs" in combined
+
+        if is_gtfs:
+            docs = _extract_gtfs_zip_docs(path, max_rows=max_rows, max_members=250)
+            if docs:
+                return docs
+            return f"[GTFS ZIP detected but no .txt/.csv extracted: {os.path.basename(path)}]"
+        # Non-GTFS zip: try unstructured, then generic unsupported
+        unstructured_out = _extract_with_unstructured(path, max_chars=200_000)
+        if unstructured_out:
+            return f"[ZIP content extracted]\n{unstructured_out}"
+        return f"[Unsupported binary format for text extraction: {os.path.basename(path)}]"
+
+    if lower.endswith(".bin") or lower.endswith(".pb") or lower.endswith(".protobuf"):
+        unstructured_out = _extract_with_unstructured(path, max_chars=200_000)
+        if unstructured_out:
+            return unstructured_out
+        return f"[Unsupported binary format for text extraction: {os.path.basename(path)}]"
+
+    # Try unstructured first for all other files (adds DOCX, XLSX, HTML, XML, better PDF, etc.)
+    unstructured_out = _extract_with_unstructured(path, max_chars=200_000)
+    if unstructured_out:
+        return unstructured_out
+
+    # Fallback: our own handling for CSV/JSON/JSONL (to respect max_rows) and simple text/PDF
     if lower.endswith(".csv"):
         df = pd.read_csv(path, nrows=max_rows)
         return f"[CSV preview: first {len(df)} rows]\n" + df.to_csv(index=False)
 
-    if lower.endswith(".json") or lower.endswith(".jsonl"):
-        if lower.endswith(".jsonl"):
+    if lower.endswith(".json") or lower.endswith(".jsonl") or lower.endswith(".geojson"):
+        if lower.endswith(".jsonl") or lower.endswith(".ndjson"):
             lines = []
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 for i, line in enumerate(f):
@@ -408,28 +447,6 @@ def extract_text_from_file(
         for p in reader.pages[:20]:
             pages.append(p.extract_text() or "")
         return "[PDF extracted text]\n" + "\n\n".join(pages)[:200_000]
-
-    if lower.endswith(".zip"):
-        r = resource or {}
-        extras = r.get("extras") or {}
-        fmt = str(r.get("format") or "")
-        mime = str(r.get("mime") or "")
-        desc = str(r.get("description") or "")
-        analysis_mime = str(extras.get("analysis:mime-type") or "")
-        combined = f"{fmt} {mime} {desc} {analysis_mime}".lower()
-        is_gtfs = "gtfs" in combined
-
-        if is_gtfs:
-            docs = _extract_gtfs_zip_docs(path, max_rows=max_rows, max_members=250)
-            if docs:
-                return docs
-            return f"[GTFS ZIP detected but no .txt/.csv extracted: {os.path.basename(path)}]"
-        return f"[Unsupported binary format for text extraction: {os.path.basename(path)}]"
-
-    if lower.endswith(".bin") or lower.endswith(".pb") or lower.endswith(".protobuf"):
-        if _looks_like_gtfs_rt(resource):
-            return extract_gtfs_rt_preview(path, max_entities=max_rows)
-        return f"[Unsupported binary format for text extraction: {os.path.basename(path)}]"
 
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:

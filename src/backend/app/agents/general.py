@@ -107,7 +107,7 @@ class GeneralAgent:
                     if not url:
                         continue
                     try:
-                        path = download_file(url, out_dir)
+                        path = download_file(url, out_dir, resource=resource)
                         logger.debug(
                             "GeneralAgent: downloaded dataset_id=%s url=%s -> path=%s",
                             dataset_id,
