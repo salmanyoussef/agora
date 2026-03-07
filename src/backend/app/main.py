@@ -1,23 +1,48 @@
 from __future__ import annotations
 
-from fastapi import FastAPI
+import json
 import logging
+import os
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from app.pipelines.retrieval import ingest_data_gouv, search_datasets
-
+from app.agents.orchestrator import AgentOrchestrator, _stream_run
+from app.pipelines.retrieval import ingest_data_gouv
 from app.weaviate.store import WeaviateStore
 
-
+_log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
+_level = getattr(logging, _log_level, logging.INFO)
 logging.basicConfig(
-    level=logging.INFO,
+    level=_level,
     format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
 )
 
 logger = logging.getLogger(__name__)
 
 
-app = FastAPI(title="Data.gouv dataset retrieval (Weaviate)")
+app = FastAPI(title="Agora — French Open Data Q&A")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Serve frontend from src/frontend
+_FRONTEND_DIR = Path(__file__).resolve().parent.parent.parent / "frontend"
+if _FRONTEND_DIR.is_dir():
+    app.mount("/static", StaticFiles(directory=_FRONTEND_DIR, html=True), name="frontend")
+
+    @app.get("/")
+    def index():
+        return FileResponse(_FRONTEND_DIR / "index.html")
 
 class SearchRequest(BaseModel):
     question: str
@@ -59,10 +84,53 @@ def ingest(req: IngestRequest):
 
 @app.post("/search")
 def search(req: SearchRequest):
-    logger.info("HTTP /search called: k=%d", req.k)
-    hits = search_datasets(req.question, k=req.k)
-    logger.info("HTTP /search completed: hits=%d", len(hits))
-    return {"hits": hits}
+
+    orchestrator = AgentOrchestrator()
+
+    result = orchestrator.run(req.question, k=req.k)
+
+    return result.model_dump()
+
+
+def _sse_stream(question: str, k: int):
+    """Yield Server-Sent Events: one event per orchestrator step.
+    When the client disconnects, the response is closed and this generator
+    receives GeneratorExit; we close the inner _stream_run generator so
+    the pipeline and any held connections are released.
+    """
+    orchestrator = AgentOrchestrator()
+    stream_run = _stream_run(orchestrator, question, k=k)
+    try:
+        for payload in stream_run:
+            yield f"data: {json.dumps(payload)}\n\n"
+    except GeneratorExit:
+        stream_run.close()
+        raise
+    finally:
+        try:
+            stream_run.close()
+        except Exception:
+            pass
+
+
+@app.post("/search/stream")
+def search_stream(req: SearchRequest):
+    """Stream search progress in real time via Server-Sent Events (SSE).
+    Connect with EventSource or fetch with stream; each event is JSON:
+    - event: 'status' | 'plan' | 'user_message' | 'done'
+    - message (for status, user_message)
+    - plan (for plan)
+    - response (for done, full AgentResponse as dict)
+    """
+    return StreamingResponse(
+        _sse_stream(req.question, k=req.k),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 @app.get("/debug/count")
 def debug_count():

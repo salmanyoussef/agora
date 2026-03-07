@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>agora — French Open Data Q&A</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #fafbfc;
+      --surface: #ffffff;
+      --surface-elevated: #ffffff;
+      --border: #e6e9ef;
+      --border-focus: #0d6efd;
+      --text: #1a1d24;
+      --text-secondary: #5c6370;
+      --text-tertiary: #8b919e;
+      --accent: #0d6efd;
+      --accent-hover: #0b5ed7;
+      --accent-subtle: #e8f0fe;
+      --success: #198754;
+      --success-bg: #d4edda;
+      --error: #dc3545;
+      --error-bg: #f8d7da;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+      --shadow: 0 4px 12px rgba(0,0,0,0.06);
+      --font: "Plus Jakarta Sans", system-ui, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 16px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .app {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: clamp(1.5rem, 4vw, 3rem) 1.25rem;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+    }
+    .logo {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      color: var(--text);
+      margin: 0 0 0.35rem 0;
+    }
+    .tagline {
+      font-size: 0.9375rem;
+      color: var(--text-secondary);
+      margin: 0;
+      max-width: 36ch;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .ask-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .ask-card label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 0.5rem;
+    }
+    .ask-card textarea {
+      width: 100%;
+      min-height: 112px;
+      padding: 1rem 1.125rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 1rem;
+      line-height: 1.5;
+      resize: vertical;
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    .ask-card textarea::placeholder { color: var(--text-tertiary); }
+    .ask-card textarea:focus {
+      outline: none;
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px var(--accent-subtle);
+    }
+    .ask-actions {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    .ask-actions label {
+      margin-bottom: 0;
+      font-weight: 500;
+    }
+    .ask-actions select {
+      padding: 0.5rem 2rem 0.5rem 0.75rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9375rem;
+      cursor: pointer;
+    }
+    .btn {
+      padding: 0.625rem 1.375rem;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+    }
+    .btn:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+    .btn:active:not(:disabled) { transform: scale(0.98); }
+    .btn:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+    .btn-stop {
+      padding: 0.625rem 1.375rem;
+      background: transparent;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    .btn-stop:hover { color: var(--error); border-color: var(--error); }
+    .btn-slot {
+      display: inline-block;
+      position: relative;
+      min-width: 6.5rem;
+      min-height: 2.5rem;
+    }
+    .btn-slot .btn,
+    .btn-slot .btn-stop {
+      position: absolute;
+      top: 0;
+      left: 0;
+      min-width: 6.5rem;
+    }
+    .btn-slot .btn-stop { display: none; }
+    .btn-slot.btn-slot--loading .btn { display: none; }
+    .btn-slot.btn-slot--loading .btn-stop { display: inline-flex; align-items: center; justify-content: center; }
+    .result-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      min-height: 120px;
+    }
+    .result-card h2 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-tertiary);
+      margin: 0 0 0.35rem 0;
+    }
+    .result-content { min-height: 3rem; }
+    .result-content.show-progress .answer-body-wrap { display: none; }
+    .result-content.show-answer .stream-log { display: none; }
+    .stream-log {
+      min-height: 3rem;
+      padding-right: 0.25rem;
+      margin-top: 0;
+    }
+    .stream-log:empty::after {
+      content: "progress will appear here as agora plans, searches, and checks datasets.";
+      display: block;
+      font-size: 0.8125rem;
+      color: var(--text-tertiary);
+      padding: 0.2rem 0;
+    }
+    .stream-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.4rem;
+      padding: 0.12rem 0;
+      font-size: 0.8125rem;
+      line-height: 1.35;
+      animation: fadeIn 0.25s ease;
+    }
+    /* Fade only the newest message, except when there are 1–2 messages: then fade both */
+    .result-card.active .stream-item:last-child .text {
+      animation: textFadeInOut 2s ease-in-out infinite;
+    }
+    .result-card.active .stream-log:has(.stream-item:nth-child(2):last-child) .stream-item:first-child .text {
+      animation: textFadeInOut 2s ease-in-out infinite;
+    }
+    .result-card.active .stream-log:has(.stream-item:nth-child(2):last-child) .stream-item:first-child .text {
+      animation: textFadeInOut 2s ease-in-out infinite;
+    }
+    @keyframes textFadeInOut {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .stream-item .text-wrap { flex: 1; min-width: 0; }
+    .stream-item .text { color: var(--text-secondary); }
+    .stream-item.user_message .text { color: var(--text); font-weight: 500; }
+    .stream-item.error .text { color: var(--error); }
+    .stream-item.expandable { cursor: pointer; }
+    .stream-item.expandable .text-wrap { cursor: pointer; }
+    .stream-item.expanded .text { white-space: pre-wrap; word-break: break-word; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .answer-body-wrap { display: none; }
+    .result-content.show-answer .answer-body-wrap { display: block; }
+    .answer-body {
+      font-size: 1rem;
+      line-height: 1.7;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+    .answer-body:empty::before {
+      content: "Your answer will appear here once processing is complete.";
+      color: var(--text-tertiary);
+    }
+    .details-section {
+      margin-top: 1.25rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--border);
+    }
+    .details-section details {
+      margin-bottom: 0.75rem;
+    }
+    .details-section summary {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: var(--accent);
+      cursor: pointer;
+      list-style: none;
+    }
+    .details-section summary::-webkit-details-marker { display: none; }
+    .details-section summary::after {
+      content: " \2193";
+      font-size: 0.75em;
+      opacity: 0.7;
+    }
+    .details-section details[open] summary::after { content: " \2191"; }
+    .details-section pre {
+      margin: 0.5rem 0 0 0;
+      padding: 1rem;
+      background: var(--bg);
+      border-radius: var(--radius-sm);
+      font-size: 0.8125rem;
+      overflow: auto;
+      max-height: 220px;
+      border: 1px solid var(--border);
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1 class="logo">agora</h1>
+      <p class="tagline">ask questions over French open government data. <b>agora</b> will plan, search, select datasets, then synthesize a data-driven answer.</p>
+    </header>
+
+    <section class="ask-card">
+      <label for="question">Your question</label>
+      <textarea id="question" placeholder="e.g. What is the feasibility of building a hotel in Lyon?" autofocus></textarea>
+      <div class="ask-actions">
+        <div id="btn-slot" class="btn-slot">
+          <button id="submit" type="button" class="btn">Ask</button>
+          <button id="stop" type="button" class="btn-stop">Stop</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="result-card" class="result-card" aria-live="polite" aria-atomic="false">
+      <h2 id="result-heading">Progress</h2>
+      <div id="result-content" class="result-content show-progress">
+        <div id="stream-log" class="stream-log"></div>
+        <div class="answer-body-wrap">
+          <div id="answer" class="answer-body"></div>
+          <div class="details-section" id="details" hidden>
+            <details>
+              <summary>Plan (subqueries)</summary>
+              <pre id="plan-json"></pre>
+            </details>
+            <details>
+              <summary>User messages</summary>
+              <pre id="user-messages-json"></pre>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const questionEl = document.getElementById("question");
+    const submitBtn = document.getElementById("submit");
+    const stopBtn = document.getElementById("stop");
+    const btnSlot = document.getElementById("btn-slot");
+    const resultCard = document.getElementById("result-card");
+    const resultHeading = document.getElementById("result-heading");
+    const resultContent = document.getElementById("result-content");
+    const streamLog = document.getElementById("stream-log");
+    const answerEl = document.getElementById("answer");
+    const detailsEl = document.getElementById("details");
+    const planJson = document.getElementById("plan-json");
+    const userMessagesJson = document.getElementById("user-messages-json");
+
+    const MAX_VISIBLE_MESSAGES = 4;
+    const TRUNCATE_LEN = 72;
+
+    function getBaseUrl() {
+      const base = document.querySelector("meta[name='api-base']")?.content;
+      if (base) return base.replace(/\/$/, "");
+      return window.location.origin;
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement("div");
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    function appendStreamMessage(fullText, kind) {
+      while (streamLog.children.length >= MAX_VISIBLE_MESSAGES)
+        streamLog.removeChild(streamLog.firstChild);
+      const truncate = fullText.length > TRUNCATE_LEN;
+      const displayText = truncate ? fullText.slice(0, TRUNCATE_LEN).trim() + "…" : fullText;
+      const item = document.createElement("div");
+      item.className = "stream-item " + (kind || "status") + (truncate ? " expandable" : "");
+      item.setAttribute("role", "status");
+      item.dataset.fullText = fullText;
+      item.innerHTML = '<span class="text-wrap"><span class="text">' + escapeHtml(displayText) + '</span></span>';
+      streamLog.appendChild(item);
+      if (truncate) {
+        const textEl = item.querySelector(".text");
+        const shortText = displayText;
+        item.setAttribute("aria-label", "Click to expand full message");
+        item.addEventListener("click", (e) => {
+          e.preventDefault();
+          const expanded = item.classList.toggle("expanded");
+          textEl.textContent = expanded ? (item.dataset.fullText || fullText) : shortText;
+        });
+      }
+    }
+
+    function setAnswer(text) {
+      answerEl.textContent = text || "";
+    }
+
+    let abortController = null;
+
+    stopBtn.addEventListener("click", () => {
+      if (abortController) abortController.abort();
+    });
+
+    submitBtn.addEventListener("click", async () => {
+      const question = questionEl.value.trim();
+      if (!question) return;
+      const k = 5;
+
+      streamLog.innerHTML = "";
+      setAnswer("");
+      detailsEl.hidden = true;
+      submitBtn.disabled = true;
+      btnSlot.classList.add("btn-slot--loading");
+      abortController = new AbortController();
+      resultHeading.textContent = "Progress";
+      resultContent.classList.remove("show-answer");
+      resultContent.classList.add("show-progress");
+      resultCard.classList.add("active");
+      appendStreamMessage("Getting started…", "status");
+
+      const base = getBaseUrl();
+      try {
+        const res = await fetch(base + "/search/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, k }),
+          signal: abortController.signal,
+        });
+        if (!res.ok) throw new Error(res.status + " " + res.statusText);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() || "";
+          for (const part of parts) {
+            if (!part.startsWith("data: ")) continue;
+            try {
+              const data = JSON.parse(part.slice(6));
+              if (data.event === "status" && data.message) appendStreamMessage(data.message, "status");
+              else if (data.event === "plan" && data.plan) { /* no progress line for plan */ }
+              else if (data.event === "user_message" && data.message) appendStreamMessage(data.message, "user_message");
+              else if (data.event === "done" && data.response) {
+                const r = data.response;
+                setAnswer(r.answer || "");
+                if (r.plan) {
+                  planJson.textContent = JSON.stringify(r.plan, null, 2);
+                  userMessagesJson.textContent = JSON.stringify(r.user_messages || [], null, 2);
+                  detailsEl.hidden = false;
+                }
+                resultHeading.textContent = "Answer";
+                resultContent.classList.remove("show-progress");
+                resultContent.classList.add("show-answer");
+              }
+            } catch (e) { console.warn("Parse SSE chunk", e); }
+          }
+        }
+      } catch (err) {
+        if (err.name === "AbortError") {
+          appendStreamMessage("Cancelled.", "status");
+        } else {
+          appendStreamMessage("Error: " + err.message, "error");
+          appendStreamMessage("Ensure the backend is running and reachable at " + base + ".", "error");
+        }
+      } finally {
+        submitBtn.disabled = false;
+        btnSlot.classList.remove("btn-slot--loading");
+        abortController = null;
+        resultCard.classList.remove("active");
+      }
+    });
+  </script>
+</body>
+</html>

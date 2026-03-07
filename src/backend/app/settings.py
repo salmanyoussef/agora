@@ -9,8 +9,10 @@ class Settings(BaseSettings):
     # Azure OpenAI
     azure_openai_endpoint: str
     azure_openai_api_key: str
+    azure_openai_embed_api_version: str = "2024-02-01"  # from env AZURE_OPENAI_EMBED_API_VERSION
     azure_openai_embed_deployment: str = "text-embedding-3-small"
     azure_openai_chat_deployment: str = "gpt-5-mini"
+    azure_openai_chat_api_version: str = "2024-12-01-preview"  # from env AZURE_OPENAI_CHAT_API_VERSION
 
     # Weaviate
     weaviate_url: str = "http://localhost:8080"

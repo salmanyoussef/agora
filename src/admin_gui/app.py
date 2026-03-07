@@ -4,34 +4,36 @@ import streamlit as st
 
 BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
 
-st.set_page_config(page_title="Weaviate Admin (Mini)", layout="wide")
-st.title("Weaviate Admin (Mini)")
+st.set_page_config(page_title="Weaviate Admin", layout="wide")
+st.title("Weaviate Admin")
 
 st.caption(f"Backend: {BACKEND_URL}")
 
-col1, col2 = st.columns(2)
-
-with col1:
-    if st.button("Refresh count"):
+# --- Dataset count ---
+st.subheader("Datasets in Weaviate")
+if st.button("Refresh count"):
+    try:
         r = requests.get(f"{BACKEND_URL}/debug/count", timeout=30)
-        st.json(r.json())
-
-with col2:
-    limit = st.number_input("Sample size", min_value=1, max_value=200, value=20, step=5)
-
-if st.button("Fetch sample objects"):
-    r = requests.get(f"{BACKEND_URL}/debug/sample", params={"limit": limit}, timeout=30)
-    data = r.json()
-    st.write(f"Collection: {data.get('collection')}")
-    items = data.get("items", [])
-    st.dataframe(items, width='stretch')
+        r.raise_for_status()
+        data = r.json()
+        st.metric("Number of datasets", data.get("count", 0))
+        st.caption(f"Collection: {data.get('collection', '—')}")
+    except requests.RequestException as e:
+        st.error(f"Request failed: {e}")
 
 st.divider()
-st.subheader("Search (via your backend /search endpoint)")
 
-q = st.text_input("Question", value="qualité de l air paris")
-k = st.slider("k", 1, 20, 5)
+# --- Sample ---
+st.subheader("Sample objects")
+limit = st.number_input("Sample size", min_value=1, max_value=200, value=20, step=5)
 
-if st.button("Search"):
-    r = requests.post(f"{BACKEND_URL}/search", json={"question": q, "k": k}, timeout=60)
-    st.json(r.json())
+if st.button("Fetch sample objects"):
+    try:
+        r = requests.get(f"{BACKEND_URL}/debug/sample", params={"limit": limit}, timeout=30)
+        r.raise_for_status()
+        data = r.json()
+        st.caption(f"Collection: {data.get('collection', '—')}")
+        items = data.get("items", [])
+        st.dataframe(items, use_container_width=True)
+    except requests.RequestException as e:
+        st.error(f"Request failed: {e}")
