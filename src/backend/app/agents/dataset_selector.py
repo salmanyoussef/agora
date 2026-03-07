@@ -16,7 +16,10 @@ class DatasetSelectorSignature(dspy.Signature):
 
     """
     Select which of the given datasets are relevant to answer the user question for
-    this subquery. For each selected dataset, assign execution_mode:
+    this subquery. You may keep the list of selected datasets Empty if none of the
+    candidates would add real value (e.g. they are off-topic or too generic).
+
+    For each selected dataset, assign execution_mode:
 
     - "rag": use ONLY when a random sample of the dataset resource is enough to
       provide context for answering the question. RAG means we will add a random
@@ -47,7 +50,7 @@ Return JSON with format:
  ]
 }
 
-- selected_datasets: list of objects. Each object must have dataset_id, execution_mode, and reasoning.
+- selected_datasets: list of objects (may be empty). Each object must have dataset_id, execution_mode, and reasoning.
 - execution_mode:
   - "rag": only when a RANDOM SAMPLE of the dataset resource is enough context for the question.
   - "technical": when we need to SEARCH for something specific in the dataset OR COMPUTE values (e.g. largest, mean, smallest, count, sum).

@@ -3,7 +3,7 @@ import logging
 from app.agents.planner import PlannerAgent
 from app.agents.general import GeneralAgent
 from app.agents.technical import TechnicalAgent
-from app.agents.synthesis import SynthesisAgent
+from app.agents.synthesis import SynthesisAgent, _build_synthesis_context
 from app.agents.dataset_selector import DatasetSelectorAgent
 
 from app.pipelines.retrieval import search_datasets
@@ -90,7 +90,9 @@ def _stream_run(orchestrator: "AgentOrchestrator", question: str, k: int):
 
     yield {"event": "status", "message": "Synthesizing answer…"}
     evidence_text = "\n\n".join(e.evidence for e in evidence_blocks)
-    answer = orchestrator.synthesis.run(question, evidence_text)
+    subquery_lines = [f"{s.question} — {s.purpose}" for s in plan.subqueries]
+    synthesis_ctx = _build_synthesis_context(plan.intent, subquery_lines)
+    answer = orchestrator.synthesis.run(question, evidence_text, context=synthesis_ctx)
 
     response = AgentResponse(
         answer=answer,
@@ -226,10 +228,12 @@ class AgentOrchestrator:
         evidence_text = "\n\n".join(
             e.evidence for e in evidence_blocks
         )
+        subquery_lines = [f"{s.question} — {s.purpose}" for s in plan.subqueries]
+        synthesis_ctx = _build_synthesis_context(plan.intent, subquery_lines)
 
         logger.info("Running synthesis agent")
 
-        answer = self.synthesis.run(question, evidence_text)
+        answer = self.synthesis.run(question, evidence_text, context=synthesis_ctx)
 
         return AgentResponse(
             answer=answer,
