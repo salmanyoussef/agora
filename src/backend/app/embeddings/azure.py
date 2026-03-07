@@ -9,6 +9,8 @@ from openai import AzureOpenAI
 
 logger = logging.getLogger(__name__)
 
+_shared_client: Optional["AzureEmbeddingClient"] = None
+
 
 @dataclass
 class AzureEmbeddingClient:
@@ -52,3 +54,24 @@ class AzureEmbeddingClient:
         resp = self.client.embeddings.create(model=self.deployment, input=texts)
         self._log_usage(resp, batch_size=len(texts))
         return [d.embedding for d in resp.data]
+
+    def close(self) -> None:
+        """Close the underlying OpenAI client and release connections."""
+        if hasattr(self.client, "close"):
+            self.client.close()
+            logger.debug("Azure embedding client closed")
+
+
+def get_embedding_client() -> "AzureEmbeddingClient":
+    """Return a shared Azure embedding client (lazy singleton). Reuse avoids leaking SSL connections."""
+    global _shared_client
+    if _shared_client is not None:
+        return _shared_client
+    from app.settings import settings
+    _shared_client = AzureEmbeddingClient(
+        azure_endpoint=settings.azure_openai_endpoint,
+        api_key=settings.azure_openai_api_key,
+        deployment=settings.azure_openai_embed_deployment,
+        api_version=settings.azure_openai_embed_api_version,
+    )
+    return _shared_client

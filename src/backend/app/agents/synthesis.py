@@ -24,15 +24,15 @@ class SynthesisSignature(dspy.Signature):
     You receive:
     - The user's original question.
     - A short summary of the search plan (intent and subqueries that were executed).
-    - Evidence: one or more text blocks produced by earlier agents. Each block comes from
-      a specific dataset (retrieved via hybrid search and then processed with RAG or
-      technical extraction). Blocks are concatenated in the same order as the subqueries.
+    - Evidence: one or more text blocks, each prefixed with [Source: ...] indicating which
+      dataset the block came from. Blocks are in subquery order (RAG or technical extraction).
 
     Your job: Produce a single, clear, user-facing answer that synthesizes the evidence.
     - Answer in the same language as the user question (typically French).
-    - Prefer one coherent answer; cite or summarize which data/sources support it.
-    - If the evidence does not support a full answer, say so and state what is missing.
-    - Do not repeat raw evidence verbatim; synthesize and attribute.
+    - Prefer one coherent answer; cite which dataset(s) support each part (use the source labels).
+    - If the evidence does not support a full answer, say so briefly and state what is missing.
+    - Do not repeat raw evidence verbatim; synthesize and attribute to sources.
+    - Do not offer to run new searches, fetch data, or perform actions; only summarize what was found and what was not covered.
     """
 
     question = dspy.InputField(desc="The user's original question.")
@@ -40,11 +40,11 @@ class SynthesisSignature(dspy.Signature):
         desc="Brief summary of the search plan: user intent and the subqueries that were run, so you know how the evidence is structured."
     )
     evidence = dspy.InputField(
-        desc="Concatenated evidence from one or more datasets (RAG or technical extraction), in subquery order."
+        desc="Evidence from one or more datasets, each block prefixed with [Source: dataset title and context]. Concatenated in subquery order."
     )
 
     answer = dspy.OutputField(
-        desc="One clear, synthesized answer for the user, in the same language as the question."
+        desc="One clear, synthesized answer for the user, in the same language as the question. Do not offer to perform searches or fetch data."
     )
 
 

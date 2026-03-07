@@ -10,6 +10,21 @@ from app.services.dspy_setup import configure_dspy, log_last_lm_call
 logger = logging.getLogger(__name__)
 
 MAX_SELECTOR_ATTEMPTS = 3
+# Truncate dataset description so the selector gets the gist without a wall of text
+MAX_DESCRIPTION_CHARS = 500
+
+
+def _truncate_description(desc: str, max_chars: int = MAX_DESCRIPTION_CHARS) -> str:
+    """Return first max_chars of description, stripping leading markdown and newlines."""
+    if not desc or not isinstance(desc, str):
+        return ""
+    s = desc.strip()
+    # Drop common leading markdown (e.g. **bold**)
+    if s.startswith("**"):
+        s = s[2:].strip()
+    if len(s) <= max_chars:
+        return s
+    return s[: max_chars - 3].rstrip() + "..."
 
 
 class DatasetSelectorSignature(dspy.Signature):
@@ -114,11 +129,12 @@ class DatasetSelectorAgent:
 
         dataset_summary = []
         for d in datasets:
+            raw_desc = d.get("description") or ""
             dataset_summary.append(
                 {
                     "dataset_id": d.get("dataset_id"),
                     "title": d.get("title"),
-                    "description": d.get("description"),
+                    "description": _truncate_description(raw_desc),
                     "organization": d.get("organization") or "",
                 }
             )

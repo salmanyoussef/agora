@@ -4,8 +4,7 @@ from typing import Optional, List
 import logging
 
 from app.clients.data_gouv import DataGouvDatasetsClient
-from app.embeddings.azure import AzureEmbeddingClient
-from app.settings import settings
+from app.embeddings.azure import get_embedding_client
 from app.weaviate.store import WeaviateStore
 
 
@@ -28,12 +27,7 @@ def ingest_data_gouv(
         hard_limit,
     )
     dg = DataGouvDatasetsClient()
-    emb_client = AzureEmbeddingClient(
-        azure_endpoint=settings.azure_openai_endpoint,
-        api_key=settings.azure_openai_api_key,
-        deployment=settings.azure_openai_embed_deployment,
-        api_version=settings.azure_openai_embed_api_version,
-    )
+    emb_client = get_embedding_client()
     store = WeaviateStore()
 
     batch_size = 128
@@ -90,12 +84,7 @@ def ingest_data_gouv(
 
 
 def search_datasets(query_text: str, k: int = 5, alpha: float = 0.5):
-    emb_client = AzureEmbeddingClient(
-        azure_endpoint=settings.azure_openai_endpoint,
-        api_key=settings.azure_openai_api_key,
-        deployment=settings.azure_openai_embed_deployment,
-        api_version=settings.azure_openai_embed_api_version,
-    )
+    emb_client = get_embedding_client()
     q_emb = emb_client.embed_texts([query_text])[0]
 
     store = WeaviateStore()

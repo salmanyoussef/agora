@@ -9,11 +9,14 @@ from app.agents.dataset_selector import DatasetSelectorAgent
 from app.pipelines.retrieval import search_datasets
 
 from app.models.agent_response import AgentResponse
+from app.models.dataset_selection import SelectedDataset
 
 logger = logging.getLogger(__name__)
 
 
-def _stream_run(orchestrator: "AgentOrchestrator", question: str, k: int):
+def _stream_run(
+    orchestrator: "AgentOrchestrator", question: str, k: int, force_rag: bool = False
+):
     """Generator that runs the orchestrator and yields SSE-style events in real time."""
     yield {"event": "status", "message": "Planning your question…"}
     plan = orchestrator.planner.run(question)
@@ -39,6 +42,17 @@ def _stream_run(orchestrator: "AgentOrchestrator", question: str, k: int):
 
         try:
             selection = orchestrator.selector.run(question, sub.question, hits)
+            if force_rag and selection.selected_datasets:
+                selection = type(selection)(
+                    selected_datasets=[
+                        SelectedDataset(
+                            dataset_id=s.dataset_id,
+                            execution_mode="rag",
+                            reasoning=s.reasoning or "",
+                        )
+                        for s in selection.selected_datasets
+                    ]
+                )
             hits_by_id = {h.get("dataset_id"): h for h in hits if h.get("dataset_id")}
 
             if selection.selected_datasets:
@@ -116,9 +130,16 @@ class AgentOrchestrator:
 
         self.synthesis = SynthesisAgent()
 
-    def run(self, question: str, k: int = 5):
-
-        logger.info("AgentOrchestrator starting for question: %s", question)
+    def run(self, question: str, k: int = 5, force_rag: bool = False):
+        """
+        Run the full pipeline: planner → retrieval → dataset selector → general/technical per dataset → synthesis.
+        If force_rag=True, every selected dataset is run with the RAG (general) agent instead of technical.
+        """
+        logger.info(
+            "AgentOrchestrator starting for question: %s (force_rag=%s)",
+            question,
+            force_rag,
+        )
 
         plan = self.planner.run(question)
 
@@ -159,6 +180,17 @@ class AgentOrchestrator:
                     sub.question,
                     hits
                 )
+                if force_rag and selection.selected_datasets:
+                    selection = type(selection)(
+                        selected_datasets=[
+                            SelectedDataset(
+                                dataset_id=s.dataset_id,
+                                execution_mode="rag",
+                                reasoning=s.reasoning or "",
+                            )
+                            for s in selection.selected_datasets
+                        ]
+                    )
 
                 hits_by_id = {h.get("dataset_id"): h for h in hits if h.get("dataset_id")}
 

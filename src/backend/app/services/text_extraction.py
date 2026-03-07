@@ -413,7 +413,7 @@ def extract_text_from_file(
             return unstructured_out
         return f"[Unsupported binary format for text extraction: {os.path.basename(path)}]"
 
-    # Try unstructured first for all other files (adds DOCX, XLSX, HTML, XML, better PDF, etc.)
+    # Try unstructured first for all other files (CSV, DOCX, XLSX, HTML, XML, PDF, etc.)
     unstructured_out = _extract_with_unstructured(path, max_chars=200_000)
     if unstructured_out:
         return unstructured_out
