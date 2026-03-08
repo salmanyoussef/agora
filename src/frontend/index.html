@@ -211,14 +211,13 @@
       line-height: 1.35;
       animation: fadeIn 0.25s ease;
     }
-    /* Fade only the newest message, except when there are 1–2 messages: then fade both */
-    .result-card.active .stream-item:last-child .text {
+    /* Fade text and links in the newest message; 1–2 messages: fade both. Link stays at full opacity only on hover. */
+    .result-card.active .stream-item:last-child .text .stream-item-fade,
+    .result-card.active .stream-item:last-child .text a {
       animation: textFadeInOut 2s ease-in-out infinite;
     }
-    .result-card.active .stream-log:has(.stream-item:nth-child(2):last-child) .stream-item:first-child .text {
-      animation: textFadeInOut 2s ease-in-out infinite;
-    }
-    .result-card.active .stream-log:has(.stream-item:nth-child(2):last-child) .stream-item:first-child .text {
+    .result-card.active .stream-log:has(.stream-item:nth-child(2):last-child) .stream-item:first-child .text .stream-item-fade,
+    .result-card.active .stream-log:has(.stream-item:nth-child(2):last-child) .stream-item:first-child .text a {
       animation: textFadeInOut 2s ease-in-out infinite;
     }
     @keyframes textFadeInOut {
@@ -245,37 +244,24 @@
       content: "Your answer will appear here once processing is complete.";
       color: var(--text-tertiary);
     }
-    .details-section {
-      margin-top: 1.25rem;
-      padding-top: 1.25rem;
-      border-top: 1px solid var(--border);
+    .stream-item .text a {
+      color: inherit;
+      text-decoration: underline;
+      word-break: break-all;
+      cursor: alias;
     }
-    .details-section details {
-      margin-bottom: 0.75rem;
+    .stream-item .text a:hover {
+      color: inherit;
+      animation-play-state: paused;
+      opacity: 1;
     }
-    .details-section summary {
-      font-size: 0.875rem;
-      font-weight: 500;
+    .answer-body a {
       color: var(--accent);
-      cursor: pointer;
-      list-style: none;
+      text-decoration: underline;
+      word-break: break-all;
     }
-    .details-section summary::-webkit-details-marker { display: none; }
-    .details-section summary::after {
-      content: " \2193";
-      font-size: 0.75em;
-      opacity: 0.7;
-    }
-    .details-section details[open] summary::after { content: " \2191"; }
-    .details-section pre {
-      margin: 0.5rem 0 0 0;
-      padding: 1rem;
-      background: var(--bg);
-      border-radius: var(--radius-sm);
-      font-size: 0.8125rem;
-      overflow: auto;
-      max-height: 220px;
-      border: 1px solid var(--border);
+    .answer-body a:hover {
+      color: var(--accent-hover);
     }
   </style>
 </head>
@@ -303,16 +289,6 @@
         <div id="stream-log" class="stream-log"></div>
         <div class="answer-body-wrap">
           <div id="answer" class="answer-body"></div>
-          <div class="details-section" id="details" hidden>
-            <details>
-              <summary>Plan (subqueries)</summary>
-              <pre id="plan-json"></pre>
-            </details>
-            <details>
-              <summary>User messages</summary>
-              <pre id="user-messages-json"></pre>
-            </details>
-          </div>
         </div>
       </div>
     </section>
@@ -328,9 +304,6 @@
     const resultContent = document.getElementById("result-content");
     const streamLog = document.getElementById("stream-log");
     const answerEl = document.getElementById("answer");
-    const detailsEl = document.getElementById("details");
-    const planJson = document.getElementById("plan-json");
-    const userMessagesJson = document.getElementById("user-messages-json");
 
     const MAX_VISIBLE_MESSAGES = 4;
     const TRUNCATE_LEN = 72;
@@ -347,6 +320,39 @@
       return div.innerHTML;
     }
 
+    /** Escape text and turn URLs into clickable links. Wraps non-link segments in .stream-item-fade so only text fades, not links. */
+    function linkify(s) {
+      if (!s) return "";
+      const urlRe = /(https?:\/\/[^\s<>"']+)/g;
+      let html = "";
+      let lastIndex = 0;
+      let m;
+      while ((m = urlRe.exec(s)) !== null) {
+        html += "<span class=\"stream-item-fade\">" + escapeHtml(s.slice(lastIndex, m.index)) + "</span>";
+        const url = m[0];
+        const safeHref = url.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        html += "<a href=\"" + safeHref + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + escapeHtml(url) + "</a>";
+        lastIndex = urlRe.lastIndex;
+      }
+      html += "<span class=\"stream-item-fade\">" + escapeHtml(s.slice(lastIndex)) + "</span>";
+      return html;
+    }
+
+    /** Like linkify; also turns markdown [text](url) into links. Use for the synthesis answer. */
+    function linkifyAnswer(s) {
+      if (!s) return "";
+      let escaped = escapeHtml(s);
+      escaped = escaped.replace(/\[([^\]]*)\]\((https?:\/\/[^)\)\s]+)\)/g, (_, text, url) => {
+        const safeHref = url.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return "<a href=\"" + safeHref + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + text + "</a>";
+      });
+      return escaped.replace(/(https?:\/\/[^\s<>"']+)/g, (url, _p1, offset, full) => {
+        if (full.slice(Math.max(0, offset - 6), offset) === "href=\"") return url;
+        const safeHref = url.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        return "<a href=\"" + safeHref + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + escapeHtml(url) + "</a>";
+      });
+    }
+
     function appendStreamMessage(fullText, kind) {
       while (streamLog.children.length >= MAX_VISIBLE_MESSAGES)
         streamLog.removeChild(streamLog.firstChild);
@@ -356,22 +362,23 @@
       item.className = "stream-item " + (kind || "status") + (truncate ? " expandable" : "");
       item.setAttribute("role", "status");
       item.dataset.fullText = fullText;
-      item.innerHTML = '<span class="text-wrap"><span class="text">' + escapeHtml(displayText) + '</span></span>';
+      item.innerHTML = '<span class="text-wrap"><span class="text">' + linkify(displayText) + '</span></span>';
       streamLog.appendChild(item);
       if (truncate) {
         const textEl = item.querySelector(".text");
         const shortText = displayText;
         item.setAttribute("aria-label", "Click to expand full message");
         item.addEventListener("click", (e) => {
+          if (e.target.closest("a")) return;
           e.preventDefault();
           const expanded = item.classList.toggle("expanded");
-          textEl.textContent = expanded ? (item.dataset.fullText || fullText) : shortText;
+          textEl.innerHTML = expanded ? linkify(item.dataset.fullText || fullText) : linkify(shortText);
         });
       }
     }
 
     function setAnswer(text) {
-      answerEl.textContent = text || "";
+      answerEl.innerHTML = linkifyAnswer(text || "");
     }
 
     let abortController = null;
@@ -387,7 +394,6 @@
 
       streamLog.innerHTML = "";
       setAnswer("");
-      detailsEl.hidden = true;
       submitBtn.disabled = true;
       btnSlot.classList.add("btn-slot--loading");
       abortController = new AbortController();
@@ -425,11 +431,6 @@
               else if (data.event === "done" && data.response) {
                 const r = data.response;
                 setAnswer(r.answer || "");
-                if (r.plan) {
-                  planJson.textContent = JSON.stringify(r.plan, null, 2);
-                  userMessagesJson.textContent = JSON.stringify(r.user_messages || [], null, 2);
-                  detailsEl.hidden = false;
-                }
                 resultHeading.textContent = "Answer";
                 resultContent.classList.remove("show-progress");
                 resultContent.classList.add("show-answer");

@@ -88,9 +88,9 @@ class DataGouvDatasetsClient:
         last_exc: Exception | None = None
         for attempt in range(1, self.retry_attempts + 1):
             try:
-                resp = self.session.get(url, params=params, timeout=self.timeout_s)
-                resp.raise_for_status()
-                return resp.json()
+                with self.session.get(url, params=params, timeout=self.timeout_s) as resp:
+                    resp.raise_for_status()
+                    return resp.json()
             except requests.RequestException as e:
                 last_exc = e
                 if attempt >= self.retry_attempts:

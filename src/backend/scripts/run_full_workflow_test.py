@@ -2,13 +2,11 @@
 Run the exact full agent workflow (planner → retrieval → dataset selector → general/technical → synthesis)
 from a single user question. Ideal for end-to-end testing without starting the API.
 
-By default all selected datasets are forced to use the RAG (general) agent so you can test the full
-pipeline without the technical agent. Use --no-force-rag to respect the selector's choice (RAG vs technical).
+RAG vs technical per dataset is controlled by USE_ONLY_GENERAL_AGENT in app.agents.orchestrator.
 
 Usage (from src/backend with venv active):
   python -m scripts.run_full_workflow_test "Quels jeux de données sur la qualité de l'air à Paris ?"
   python -m scripts.run_full_workflow_test "Transports en France" --k 5
-  python -m scripts.run_full_workflow_test "..." --no-force-rag   # use real RAG/technical choice
   LOG_LEVEL=DEBUG python -m scripts.run_full_workflow_test "Your question"
 """
 from __future__ import annotations
@@ -41,11 +39,6 @@ def main() -> None:
         help="Number of datasets to retrieve per subquery (default 5)",
     )
     parser.add_argument(
-        "--no-force-rag",
-        action="store_true",
-        help="Do not force RAG; use selector's execution_mode (RAG vs technical) for each dataset",
-    )
-    parser.add_argument(
         "--json",
         action="store_true",
         help="Print full response as JSON at the end",
@@ -60,16 +53,14 @@ def main() -> None:
     )
 
     logger = logging.getLogger(__name__)
-    force_rag = not args.no_force_rag
     logger.info(
-        "Running full workflow: question=%r k=%d force_rag=%s",
+        "Running full workflow: question=%r k=%d",
         args.question[:80] + ("..." if len(args.question) > 80 else ""),
         args.k,
-        force_rag,
     )
 
     orchestrator = AgentOrchestrator()
-    result = orchestrator.run(args.question, k=args.k, force_rag=force_rag)
+    result = orchestrator.run(args.question, k=args.k)
 
     # Pretty-print the result (mimics what the UI would show)
     print("\n" + "=" * 70)

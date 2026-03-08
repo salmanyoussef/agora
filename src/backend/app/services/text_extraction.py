@@ -413,7 +413,20 @@ def extract_text_from_file(
             return unstructured_out
         return f"[Unsupported binary format for text extraction: {os.path.basename(path)}]"
 
-    # Try unstructured first for all other files (CSV, DOCX, XLSX, HTML, XML, PDF, etc.)
+    # PDF: use pypdf only. Unstructured's PDF path uses pikepdf/LLVM and can crash the process
+    # on some platforms (e.g. WSL2, ARM), so we avoid it for PDFs.
+    if lower.endswith(".pdf"):
+        try:
+            reader = PdfReader(path)
+            pages = []
+            for p in reader.pages[:20]:
+                pages.append(p.extract_text() or "")
+            return "[PDF extracted text]\n" + "\n\n".join(pages)[:200_000]
+        except Exception as e:
+            logger.warning("pypdf extraction failed for %s: %s", path, e)
+            return f"[PDF extraction failed: {os.path.basename(path)}]"
+
+    # Try unstructured first for all other files (CSV, DOCX, XLSX, HTML, XML, etc.; PDFs handled above)
     unstructured_out = _extract_with_unstructured(path, max_chars=200_000)
     if unstructured_out:
         return unstructured_out
@@ -440,13 +453,6 @@ def extract_text_from_file(
     if lower.endswith(".txt") or lower.endswith(".md"):
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             return f.read()[:200_000]
-
-    if lower.endswith(".pdf"):
-        reader = PdfReader(path)
-        pages = []
-        for p in reader.pages[:20]:
-            pages.append(p.extract_text() or "")
-        return "[PDF extracted text]\n" + "\n\n".join(pages)[:200_000]
 
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:

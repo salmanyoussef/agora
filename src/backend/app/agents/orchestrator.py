@@ -13,9 +13,29 @@ from app.models.dataset_selection import SelectedDataset
 
 logger = logging.getLogger(__name__)
 
+# Set to False to use the dataset selector's choice (general vs technical agent) per dataset.
+# When True, every dataset is run with the general (RAG) agent only.
+USE_ONLY_GENERAL_AGENT = True
+
+# Public dataset page on data.gouv.fr (used when hit has no url)
+DATA_GOUV_DATASET_PAGE_BASE = "https://www.data.gouv.fr/fr/datasets"
+
+
+def _dataset_ref_from_hit(hit: dict) -> dict:
+    """Build a reference dict (title, organization, url) for a dataset hit."""
+    dataset_id = hit.get("dataset_id") or hit.get("id") or ""
+    url = (hit.get("url") or "").strip()
+    if not url and dataset_id:
+        url = f"{DATA_GOUV_DATASET_PAGE_BASE}/{dataset_id}/"
+    return {
+        "title": hit.get("title") or "Unknown dataset",
+        "organization": hit.get("organization") or "Unknown organization",
+        "url": url,
+    }
+
 
 def _stream_run(
-    orchestrator: "AgentOrchestrator", question: str, k: int, force_rag: bool = False
+    orchestrator: "AgentOrchestrator", question: str, k: int
 ):
     """Generator that runs the orchestrator and yields SSE-style events in real time."""
     yield {"event": "status", "message": "Planning your question…"}
@@ -25,6 +45,8 @@ def _stream_run(
     evidence_blocks = []
     all_hits = []
     user_messages = []
+    used_dataset_refs: list[dict] = []
+    seen_dataset_ids: set[str] = set()
 
     for sub in plan.subqueries:
         yield {"event": "status", "message": f"Searching datasets for: {sub.question}"}
@@ -42,7 +64,7 @@ def _stream_run(
 
         try:
             selection = orchestrator.selector.run(question, sub.question, hits)
-            if force_rag and selection.selected_datasets:
+            if USE_ONLY_GENERAL_AGENT and selection.selected_datasets:
                 selection = type(selection)(
                     selected_datasets=[
                         SelectedDataset(
@@ -60,12 +82,12 @@ def _stream_run(
                     hit = hits_by_id.get(sel.dataset_id)
                     if not hit:
                         continue
-                    title = hit.get("title") or "Unknown dataset"
-                    org = hit.get("organization") or "Unknown organization"
+                    ref = _dataset_ref_from_hit(hit)
+                    title, org, url = ref["title"], ref["organization"], ref.get("url") or ""
                     mode_label = "RAG" if sel.execution_mode == "rag" else "technical"
                     if sel.reasoning and sel.reasoning.strip():
                         msg = (
-                            f"Checking dataset: «{title}» by {org} ({mode_label}). "
+                            f"Checking dataset: «{title}» by {org} ({mode_label}) - "
                             f"{sel.reasoning.strip()}"
                         )
                     else:
@@ -73,30 +95,45 @@ def _stream_run(
                             f"Checking dataset: «{title}» by {org} ({mode_label}) "
                             f"for relevant information."
                         )
+                    if url:
+                        msg = f"{msg} | {url}"
                     user_messages.append(msg)
                     yield {"event": "user_message", "message": msg}
-                    if sel.execution_mode == "rag":
+                    did = hit.get("dataset_id")
+                    if did and did not in seen_dataset_ids:
+                        seen_dataset_ids.add(did)
+                        used_dataset_refs.append(ref)
+                    if USE_ONLY_GENERAL_AGENT:
                         result = orchestrator.general_agent.run(
                             sub.question, [hit], dataset_reasoning=sel.reasoning or ""
                         )
-                        evidence_blocks.append(result)
+                    elif sel.execution_mode == "rag":
+                        result = orchestrator.general_agent.run(
+                            sub.question, [hit], dataset_reasoning=sel.reasoning or ""
+                        )
                     else:
                         result = orchestrator.technical_agent.run(
                             sub.question, [hit], dataset_reasoning=sel.reasoning or ""
                         )
-                        evidence_blocks.append(result)
+                    evidence_blocks.append(result)
 
         except Exception as e:
             logger.warning("Dataset selector failed, using raw hits. Error: %s", e)
             for hit in hits:
-                title = hit.get("title") or "Unknown dataset"
-                org = hit.get("organization") or "Unknown organization"
+                ref = _dataset_ref_from_hit(hit)
+                title, org, url = ref["title"], ref["organization"], ref.get("url") or ""
                 msg = (
                     f"Checking dataset: «{title}» by {org} (RAG) "
                     f"for relevant information."
                 )
+                if url:
+                    msg = f"{msg} | {url}"
                 user_messages.append(msg)
                 yield {"event": "user_message", "message": msg}
+                did = hit.get("dataset_id")
+                if did and did not in seen_dataset_ids:
+                    seen_dataset_ids.add(did)
+                    used_dataset_refs.append(ref)
                 result = orchestrator.general_agent.run(
                     sub.question, [hit], dataset_reasoning=""
                 )
@@ -105,7 +142,9 @@ def _stream_run(
     yield {"event": "status", "message": "Synthesizing answer…"}
     evidence_text = "\n\n".join(e.evidence for e in evidence_blocks)
     subquery_lines = [f"{s.question} — {s.purpose}" for s in plan.subqueries]
-    synthesis_ctx = _build_synthesis_context(plan.intent, subquery_lines)
+    synthesis_ctx = _build_synthesis_context(
+        plan.intent, subquery_lines, dataset_refs=used_dataset_refs
+    )
     answer = orchestrator.synthesis.run(question, evidence_text, context=synthesis_ctx)
 
     response = AgentResponse(
@@ -130,15 +169,15 @@ class AgentOrchestrator:
 
         self.synthesis = SynthesisAgent()
 
-    def run(self, question: str, k: int = 5, force_rag: bool = False):
+    def run(self, question: str, k: int = 5):
         """
         Run the full pipeline: planner → retrieval → dataset selector → general/technical per dataset → synthesis.
-        If force_rag=True, every selected dataset is run with the RAG (general) agent instead of technical.
+        Use USE_ONLY_GENERAL_AGENT in this module to force RAG-only mode.
         """
         logger.info(
-            "AgentOrchestrator starting for question: %s (force_rag=%s)",
+            "AgentOrchestrator starting for question: %s (USE_ONLY_GENERAL_AGENT=%s)",
             question,
-            force_rag,
+            USE_ONLY_GENERAL_AGENT,
         )
 
         plan = self.planner.run(question)
@@ -146,6 +185,8 @@ class AgentOrchestrator:
         evidence_blocks = []
         all_hits = []
         user_messages = []
+        used_dataset_refs: list[dict] = []
+        seen_dataset_ids: set[str] = set()
 
         for sub in plan.subqueries:
 
@@ -180,7 +221,7 @@ class AgentOrchestrator:
                     sub.question,
                     hits
                 )
-                if force_rag and selection.selected_datasets:
+                if USE_ONLY_GENERAL_AGENT and selection.selected_datasets:
                     selection = type(selection)(
                         selected_datasets=[
                             SelectedDataset(
@@ -191,7 +232,6 @@ class AgentOrchestrator:
                             for s in selection.selected_datasets
                         ]
                     )
-
                 hits_by_id = {h.get("dataset_id"): h for h in hits if h.get("dataset_id")}
 
                 if selection.selected_datasets:
@@ -204,35 +244,46 @@ class AgentOrchestrator:
                         if not hit:
                             logger.warning("Selected dataset id not in hits: %s", sel.dataset_id)
                             continue
-                        title = hit.get("title") or "Unknown dataset"
-                        org = hit.get("organization") or "Unknown organization"
+                        ref = _dataset_ref_from_hit(hit)
+                        title, org, url = ref["title"], ref["organization"], ref.get("url") or ""
                         mode_label = "RAG" if sel.execution_mode == "rag" else "technical"
                         if sel.reasoning and sel.reasoning.strip():
                             msg = (
-                                f"Checking dataset: «{title}» by {org} ({mode_label}) "
-                                f"to find relevant information about: {sel.reasoning.strip()}"
+                                f"Checking dataset: «{title}» by {org} ({mode_label}) - "
+                                f"{sel.reasoning.strip()}"
                             )
                         else:
                             msg = (
                                 f"Checking dataset: «{title}» by {org} ({mode_label}) "
                                 f"for relevant information."
                             )
+                        if url:
+                            msg = f"{msg} | {url}"
                         user_messages.append(msg)
                         logger.info("User message: %s", msg)
-                        if sel.execution_mode == "rag":
+                        did = hit.get("dataset_id")
+                        if did and did not in seen_dataset_ids:
+                            seen_dataset_ids.add(did)
+                            used_dataset_refs.append(ref)
+                        if USE_ONLY_GENERAL_AGENT:
                             result = self.general_agent.run(
                                 sub.question,
                                 [hit],
                                 dataset_reasoning=sel.reasoning or "",
                             )
-                            evidence_blocks.append(result)
+                        elif sel.execution_mode == "rag":
+                            result = self.general_agent.run(
+                                sub.question,
+                                [hit],
+                                dataset_reasoning=sel.reasoning or "",
+                            )
                         else:
                             result = self.technical_agent.run(
                                 sub.question,
                                 [hit],
                                 dataset_reasoning=sel.reasoning or "",
                             )
-                            evidence_blocks.append(result)
+                        evidence_blocks.append(result)
 
             except Exception as e:
 
@@ -241,14 +292,20 @@ class AgentOrchestrator:
                     e
                 )
                 for hit in hits:
-                    title = hit.get("title") or "Unknown dataset"
-                    org = hit.get("organization") or "Unknown organization"
+                    ref = _dataset_ref_from_hit(hit)
+                    title, org, url = ref["title"], ref["organization"], ref.get("url") or ""
                     msg = (
                         f"Checking dataset: «{title}» by {org} (RAG) "
                         f"for relevant information."
                     )
+                    if url:
+                        msg = f"{msg} | {url}"
                     user_messages.append(msg)
                     logger.info("User message: %s", msg)
+                    did = hit.get("dataset_id")
+                    if did and did not in seen_dataset_ids:
+                        seen_dataset_ids.add(did)
+                        used_dataset_refs.append(ref)
                     result = self.general_agent.run(
                         sub.question,
                         [hit],
@@ -261,7 +318,9 @@ class AgentOrchestrator:
             e.evidence for e in evidence_blocks
         )
         subquery_lines = [f"{s.question} — {s.purpose}" for s in plan.subqueries]
-        synthesis_ctx = _build_synthesis_context(plan.intent, subquery_lines)
+        synthesis_ctx = _build_synthesis_context(
+            plan.intent, subquery_lines, dataset_refs=used_dataset_refs
+        )
 
         logger.info("Running synthesis agent")
 
