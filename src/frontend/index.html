@@ -48,7 +48,7 @@
     }
     .header {
       text-align: center;
-      margin-bottom: 2.5rem;
+      margin-bottom: 0.875rem;
     }
     .logo {
       font-size: 1.75rem;
@@ -136,6 +136,13 @@
     .btn:hover:not(:disabled) {
       background: var(--accent-hover);
     }
+    .btn-ask {
+      background: #198754;
+      color: #fff;
+    }
+    .btn-ask:hover:not(:disabled) {
+      background: #157347;
+    }
     .btn:active:not(:disabled) { transform: scale(0.98); }
     .btn:disabled {
       opacity: 0.7;
@@ -154,6 +161,63 @@
       transition: color 0.15s, border-color 0.15s;
     }
     .btn-stop:hover { color: var(--error); border-color: var(--error); }
+    .mode-prompt {
+      font-size: 0.9375rem;
+      color: #7552a1;
+      margin: 0.75rem 0 0 0;
+      transition: opacity 0.3s;
+    }
+    .mode-prompt.mode-prompt--hidden {
+      display: none;
+    }
+    .mode-prompt:not(.mode-prompt--hidden) {
+      animation: mode-fade-pulse 1.75s ease-in-out infinite;
+    }
+    .mode-toggle-wrap {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+      padding: 0 1.25rem;
+      max-width: 100%;
+    }
+    .mode-toggle-wrap .btn-mode {
+      padding: 0.625rem 1.375rem;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.9375rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, filter 0.15s, transform 0.1s, opacity 0.3s;
+    }
+    .mode-toggle-wrap .btn-mode:active { transform: scale(0.98); }
+    .mode-toggle-wrap.mode-toggle--none-selected .btn-mode {
+      animation: mode-fade-pulse 1.75s ease-in-out infinite;
+    }
+    @keyframes mode-fade-pulse {
+      0%, 100% { opacity: 0.82; }
+      50% { opacity: 1; }
+    }
+    .btn-mode-general {
+      background: #dc3545;
+      color: #fff;
+    }
+    .btn-mode-general:hover { background: #c82333; }
+    .btn-mode-general.btn-mode--selected { filter: brightness(0.65); animation: none; }
+    .btn-mode-technical {
+      background: #0d6efd;
+      color: #fff;
+    }
+    .btn-mode-technical:hover { background: #0b5ed7; }
+    .btn-mode-technical.btn-mode--selected { filter: brightness(0.65); animation: none; }
+    .ask-card textarea.ask-disabled {
+      background: var(--border);
+      color: var(--text-tertiary);
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    .ask-card textarea.ask-disabled::placeholder { color: var(--text-tertiary); }
     .btn-slot {
       display: inline-block;
       position: relative;
@@ -270,14 +334,20 @@
     <header class="header">
       <h1 class="logo">agora</h1>
       <p class="tagline">ask questions over French open government data. <b>agora</b> will plan, search, select datasets, then synthesize a data-driven answer.</p>
+      <p id="mode-prompt" class="mode-prompt">Please select mode: general or technical to get started.</p>
     </header>
+
+    <div id="mode-toggle-wrap" class="mode-toggle-wrap mode-toggle--none-selected">
+      <button type="button" id="mode-general" class="btn-mode btn-mode-general" aria-pressed="false">General</button>
+      <button type="button" id="mode-technical" class="btn-mode btn-mode-technical" aria-pressed="false">Technical</button>
+    </div>
 
     <section class="ask-card">
       <label for="question">Your question</label>
-      <textarea id="question" placeholder="e.g. What is the feasibility of building a hotel in Lyon?" autofocus></textarea>
+      <textarea id="question" placeholder="e.g. What is the feasibility of building a hotel in Lyon?" autofocus disabled></textarea>
       <div class="ask-actions">
         <div id="btn-slot" class="btn-slot">
-          <button id="submit" type="button" class="btn">Ask</button>
+          <button id="submit" type="button" class="btn btn-ask" disabled>Ask</button>
           <button id="stop" type="button" class="btn-stop">Stop</button>
         </div>
       </div>
@@ -299,6 +369,34 @@
     const submitBtn = document.getElementById("submit");
     const stopBtn = document.getElementById("stop");
     const btnSlot = document.getElementById("btn-slot");
+    const modeGeneralBtn = document.getElementById("mode-general");
+    const modeTechnicalBtn = document.getElementById("mode-technical");
+    const modeToggleWrap = document.getElementById("mode-toggle-wrap");
+    const modePromptEl = document.getElementById("mode-prompt");
+
+    /** "general" | "technical" | null (not chosen yet) */
+    let selectedMode = null;
+
+    function setMode(mode) {
+      selectedMode = mode;
+      modeGeneralBtn.classList.toggle("btn-mode--selected", mode === "general");
+      modeGeneralBtn.setAttribute("aria-pressed", mode === "general" ? "true" : "false");
+      modeTechnicalBtn.classList.toggle("btn-mode--selected", mode === "technical");
+      modeTechnicalBtn.setAttribute("aria-pressed", mode === "technical" ? "true" : "false");
+      modeToggleWrap.classList.toggle("mode-toggle--none-selected", !mode);
+      modePromptEl.classList.toggle("mode-prompt--hidden", !!mode);
+      if (mode) {
+        questionEl.disabled = false;
+        questionEl.classList.remove("ask-disabled");
+      } else {
+        questionEl.disabled = true;
+        questionEl.classList.add("ask-disabled");
+      }
+      submitBtn.disabled = !mode;
+    }
+
+    modeGeneralBtn.addEventListener("click", () => setMode(selectedMode === "general" ? null : "general"));
+    modeTechnicalBtn.addEventListener("click", () => setMode(selectedMode === "technical" ? null : "technical"));
     const resultCard = document.getElementById("result-card");
     const resultHeading = document.getElementById("result-heading");
     const resultContent = document.getElementById("result-content");
@@ -389,8 +487,9 @@
 
     submitBtn.addEventListener("click", async () => {
       const question = questionEl.value.trim();
-      if (!question) return;
+      if (!question || !selectedMode) return;
       const k = 5;
+      const use_only_general_agent = selectedMode === "general";
 
       streamLog.innerHTML = "";
       setAnswer("");
@@ -408,7 +507,7 @@
         const res = await fetch(base + "/search/stream", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ question, k }),
+          body: JSON.stringify({ question, k, use_only_general_agent }),
           signal: abortController.signal,
         });
         if (!res.ok) throw new Error(res.status + " " + res.statusText);

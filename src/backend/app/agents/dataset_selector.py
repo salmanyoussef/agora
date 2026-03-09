@@ -5,7 +5,7 @@ import time
 import dspy
 
 from app.models.dataset_selection import DatasetSelection, SelectedDataset
-from app.services.dspy_setup import configure_dspy, log_last_lm_call
+from app.services.dspy_setup import configure_dspy, log_last_lm_call, log_lm_usage
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +148,7 @@ class DatasetSelectorAgent:
         datasets_json = json.dumps(dataset_summary)
         parsed = {"selected_datasets": []}
         last_result = None
+        usage = None
 
         for attempt in range(1, MAX_SELECTOR_ATTEMPTS + 1):
             logger.info("DatasetSelectorAgent LLM call started (attempt %d/%d)", attempt, MAX_SELECTOR_ATTEMPTS)
@@ -165,9 +166,15 @@ class DatasetSelectorAgent:
                 continue
             elapsed_ms = (time.perf_counter() - started_at) * 1000
             logger.info("DatasetSelectorAgent LLM call completed in %.1f ms", elapsed_ms)
+            usage = None
+            try:
+                usage = last_result.get_lm_usage()
+            except Exception:
+                pass
             log_last_lm_call(caller="dataset_selector")
             logger.info("DatasetSelectorAgent DSPy response trace (last call):")
             dspy.inspect_history(n=1)
+            log_lm_usage("dataset_selector", usage)
 
             parsed, valid = self._parse_and_validate(last_result.output_json or "{}")
             if valid:
@@ -176,6 +183,8 @@ class DatasetSelectorAgent:
                 logger.warning("DatasetSelectorAgent invalid format, retrying (%d/%d)", attempt, MAX_SELECTOR_ATTEMPTS)
 
         selection_model = self._build_selection(parsed)
+        if usage is not None:
+            selection_model = selection_model.model_copy(update={"lm_usage": usage})
 
         selected_id_set = {s.dataset_id for s in selection_model.selected_datasets}
         summary_selected = [

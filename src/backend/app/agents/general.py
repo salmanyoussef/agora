@@ -9,7 +9,7 @@ import dspy
 
 from app.clients.data_gouv import DataGouvDatasetsClient, extract_resource_urls
 from app.models.execution_result import ExecutionResult
-from app.services.dspy_setup import configure_dspy, log_last_lm_call
+from app.services.dspy_setup import configure_dspy, log_last_lm_call, log_lm_usage
 from app.services.text_extraction import download_file, extract_text_from_file
 
 logger = logging.getLogger(__name__)
@@ -125,19 +125,19 @@ def _retrieve_relevant_chunks(
     top_k: int,
     embed_client: Any,
     max_per_resource: int = RAG_MAX_CHUNKS_PER_RESOURCE,
-) -> List[Dict[str, Any]]:
-    """Embed subquery and chunks, rank by similarity, return top-k with per-resource cap."""
+) -> tuple[List[Dict[str, Any]], Optional[Dict[str, int]]]:
+    """Embed subquery and chunks, rank by similarity, return (top-k with per-resource cap, embed_usage)."""
     if not chunks:
-        return []
+        return [], None
     chunk_texts = [c["chunk"] for c in chunks]
     try:
         texts = [subquery] + chunk_texts
-        embeddings = embed_client.embed_texts(texts)
+        embeddings, embed_usage = embed_client.embed_texts(texts)
     except Exception as e:
         logger.warning("Chunk retrieval embedding failed, using all chunks: %s", e)
-        return chunks[:top_k]
+        return chunks[:top_k], None
     if len(embeddings) != len(texts):
-        return chunks[:top_k]
+        return chunks[:top_k], None
     query_emb = embeddings[0]
     chunk_embs = embeddings[1:]
     scored = [
@@ -158,7 +158,7 @@ def _retrieve_relevant_chunks(
             continue
         selected.append(c)
         per_resource_count[rid] = n + 1
-    return selected
+    return selected, embed_usage
 
 
 _EMBED_CLIENT: Optional[Any] = None
@@ -225,7 +225,7 @@ def _rag_answer(
     context: str,
     focus: str = "",
     pipeline_role: str = "",
-) -> str:
+) -> tuple[str, Optional[Dict[str, Any]]]:
     configure_dspy()
     focus_text = focus.strip() if focus else "(No specific focus provided.)"
     role_text = (pipeline_role or PIPELINE_ROLE_REMINDER).strip()
@@ -244,6 +244,7 @@ def _rag_answer(
     )
     elapsed_ms = (time.perf_counter() - started_at) * 1000
     logger.info("GeneralAgent RAG call completed in %.1f ms", elapsed_ms)
+    usage = None
     try:
         usage = pred.get_lm_usage()
         if usage is not None:
@@ -253,7 +254,8 @@ def _rag_answer(
     log_last_lm_call(caller="general_rag")
     logger.info("GeneralAgent DSPy response trace (last call):")
     dspy.inspect_history(n=1)
-    return pred.answer or "No answer could be produced from the given context."
+    log_lm_usage("general_rag", usage)
+    return pred.answer or "No answer could be produced from the given context.", usage
 
 
 class GeneralAgent:
@@ -369,11 +371,12 @@ class GeneralAgent:
             return "\n\n---\n\n".join(parts) if parts else ""
 
         # Optionally chunk and retrieve most relevant chunks by embedding similarity (with per-resource cap)
+        embed_usage: Optional[Dict[str, int]] = None
         if RAG_USE_CHUNK_RETRIEVAL and evidence_blocks:
             chunks = _chunk_evidence(evidence_blocks)
             embed_client = _get_embed_client()
             if embed_client and len(chunks) > 1:
-                selected = _retrieve_relevant_chunks(
+                selected, embed_usage = _retrieve_relevant_chunks(
                     chunks,
                     subquery,
                     top_k=RAG_TOP_K_CHUNKS,
@@ -404,7 +407,7 @@ class GeneralAgent:
             len(context),
         )
 
-        rag_answer = _rag_answer(
+        rag_answer, rag_usage = _rag_answer(
             subquery,
             context,
             focus=dataset_reasoning,
@@ -419,4 +422,6 @@ class GeneralAgent:
             mode="rag",
             subquery=subquery,
             evidence=rag_answer,
+            lm_usage=rag_usage,
+            embed_usage=embed_usage,
         )

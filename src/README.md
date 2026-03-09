@@ -27,11 +27,15 @@ docker compose up -d
 
 1. **Planner** — Derives intent and subqueries from the user question.
 2. **Search** — Hybrid (vector + keyword) search over Weaviate for dataset hits.
-3. **Dataset selector** — Chooses which datasets to use and whether to run RAG or technical extraction.
-4. **RAG (general) or technical agent** — Per selected dataset: download resources, extract text; for RAG, chunk and embed with a shared Azure embedding client, retrieve top-k chunks, then generate an evidence block.
+3. **Dataset selector** — Chooses which datasets to use and, when in **Technical** mode, whether each dataset should be handled by RAG (general) or technical extraction.
+4. **RAG (general) or technical agent** — Per selected dataset:
+   - **General (RAG only)** — Download → extract text → chunk → embed → retrieve top-k chunks → LLM evidence. No RLM, no structured computation.
+   - **Technical (per-resource choice)** — For each resource: if structured (CSV, JSON, XLSX, etc.), parse into records and run the **Technical agent** (RLM explores schema + preview in a sandboxed REPL); if not structured (e.g. PDF), use the same text extraction as the General agent and include it in the technical context. So Technical mode uses **both** general-style extraction and technical analysis depending on what the pipeline decides is best for each resource.
 5. **Synthesis** — Combines evidence (with `[Source: dataset]` labels) into one final answer in the same language as the question.
 
-Embeddings use a **shared singleton client** (`get_embedding_client()`) to avoid connection leaks; chat/synthesis uses DSPy with Azure OpenAI.
+**Frontend mode:** The UI lets you pick **General** or **Technical** before asking. General forces RAG-only for all datasets; Technical lets the selector choose RAG vs technical per dataset and runs the Technical agent where appropriate.
+
+Embeddings use a **shared singleton client** (`get_embedding_client()`) to avoid connection leaks; chat/synthesis uses DSPy with Azure OpenAI. **Usage and cost:** The backend logs LLM token usage per agent and a pipeline grand total, plus embedding usage (search + RAG chunk retrieval only, not Weaviate ingestion); when the configured models have known pricing (e.g. gpt-5-mini, text-embedding-3-small), it logs an estimated cost at the end of each run.
 
 ## Backend setup – development
 
@@ -96,7 +100,7 @@ curl -X POST http://localhost:8000/search/stream \
   -d '{"question":"Quels jeux de données sur la qualité de l'\''air à Paris ?","k":5}'
 ```
 
-The frontend (see **`src/frontend/`**) uses the streaming endpoint and shows progress plus the final answer.
+The frontend (see **`src/frontend/`**) uses the streaming endpoint and shows progress plus the final answer. Before submitting, you choose **General** (RAG only) or **Technical** (RAG + technical per resource); see **General vs Technical** in the root README.
 
 ### Ingest the French data.gouv catalogue (15k sample vs full ~73k)
 

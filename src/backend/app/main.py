@@ -47,6 +47,10 @@ if _FRONTEND_DIR.is_dir():
 class SearchRequest(BaseModel):
     question: str
     k: int = Field(default=5, ge=1, le=50)
+    use_only_general_agent: bool | None = Field(
+        default=None,
+        description="If True, use RAG (general) only; if False, use both RAG and technical. None = use server default.",
+    )
 
 class IngestRequest(BaseModel):
     mode: str = "single_page"
@@ -92,14 +96,14 @@ def search(req: SearchRequest):
     return result.model_dump()
 
 
-def _sse_stream(question: str, k: int):
+def _sse_stream(question: str, k: int, use_only_general_agent: bool | None = None):
     """Yield Server-Sent Events: one event per orchestrator step.
     When the client disconnects, the response is closed and this generator
     receives GeneratorExit; we close the inner _stream_run generator so
     the pipeline and any held connections are released.
     """
     orchestrator = AgentOrchestrator()
-    stream_run = _stream_run(orchestrator, question, k=k)
+    stream_run = _stream_run(orchestrator, question, k=k, use_only_general_agent=use_only_general_agent)
     try:
         for payload in stream_run:
             yield f"data: {json.dumps(payload)}\n\n"
@@ -123,7 +127,7 @@ def search_stream(req: SearchRequest):
     - response (for done, full AgentResponse as dict)
     """
     return StreamingResponse(
-        _sse_stream(req.question, k=req.k),
+        _sse_stream(req.question, k=req.k, use_only_general_agent=req.use_only_general_agent),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

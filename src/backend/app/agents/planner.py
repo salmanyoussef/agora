@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import dspy
 
 from app.models.plan import QueryPlan, SubQuery
-from app.services.dspy_setup import configure_dspy, log_last_lm_call
+from app.services.dspy_setup import configure_dspy, log_last_lm_call, log_lm_usage
 
 logger = logging.getLogger(__name__)
 
@@ -72,15 +72,21 @@ class PlannerAgent:
         result = self.module(question=question, current_timestamp=current_timestamp)
         elapsed_ms = (time.perf_counter() - started_at) * 1000
         logger.info("PlannerAgent LLM call completed in %.1f ms", elapsed_ms)
+        usage = None
+        try:
+            usage = result.get_lm_usage()
+        except Exception:
+            pass
         log_last_lm_call(caller="planner")
         logger.info("PlannerAgent DSPy response trace (last call):")
         dspy.inspect_history(n=1)
+        log_lm_usage("planner", usage)
 
         try:
             data = json.loads(result.output_json)
         except Exception:
             logger.warning("Planner JSON parse failed")
-            return QueryPlan(intent=question, subqueries=[])
+            return QueryPlan(intent=question, subqueries=[], lm_usage=usage)
 
         subs = []
 
@@ -93,7 +99,7 @@ class PlannerAgent:
                 )
             )
 
-        plan = QueryPlan(intent=data.get("intent", question), subqueries=subs)
+        plan = QueryPlan(intent=data.get("intent", question), subqueries=subs, lm_usage=usage)
 
         logger.info("Planner intent: %s", plan.intent)
         for s in plan.subqueries:

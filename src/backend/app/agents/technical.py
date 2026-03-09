@@ -4,9 +4,13 @@ Technical Agent: structured-data pipeline for computation-oriented subqueries.
 Flow: download → detect structure → parse into dataframe/records → build technical
 context → RLM explores → final structured answer.
 
+Uses DSPy's RLM (Recursive Language Model): the model explores the technical context
+via a sandboxed Python REPL—writing code to inspect, filter, aggregate, and calling
+llm_query() for semantic extraction—then SUBMIT(answer). This avoids context rot on
+large data. Falls back to dspy.Predict if the REPL is unavailable (e.g. Deno not installed).
+
 Unlike the General Agent (download → extract text → chunk → semantic retrieval → answer),
-we do not chunk or embed; we normalize data into machine-usable records and let the
-model reason over schema + preview.
+we do not chunk or embed; we normalize data into machine-usable records.
 """
 
 from __future__ import annotations
@@ -20,7 +24,7 @@ import dspy
 
 from app.clients.data_gouv import DataGouvDatasetsClient, extract_resource_urls
 from app.models.execution_result import ExecutionResult
-from app.services.dspy_setup import configure_dspy, log_last_lm_call
+from app.services.dspy_setup import configure_dspy, log_last_lm_call, log_lm_usage
 from app.services.structured_data import (
     ParsedData,
     build_technical_context,
@@ -40,6 +44,11 @@ MAX_CONTEXT_CHARS = 80_000  # cap context to avoid token overflow
 # For unsuitable resources we use the same text extraction as the General Agent
 MAX_ROWS_UNSTRUCTURED = 200  # same as GeneralAgent's MAX_ROWS_PER_RESOURCE for text
 MAX_CHARS_UNSTRUCTURED_PER_BLOCK = 15_000  # cap each extracted text block
+
+# DSPy RLM (Recursive Language Model) knobs
+RLM_MAX_ITERATIONS = 15
+RLM_MAX_LLM_CALLS = 30
+RLM_VERBOSE = True # set True for detailed REPL iteration logs
 
 
 def _resource_metadata_str(
@@ -111,23 +120,59 @@ def _explore_with_rlm(
         len(focus_text),
     )
     started_at = time.perf_counter()
-    pred = dspy.Predict(ExploreTechnicalContext)(
-        technical_context=technical_context,
-        question=question,
-        focus=focus_text,
-    )
+    use_rlm = True
+    pred = None
+
+    try:
+        rlm = dspy.RLM(
+            ExploreTechnicalContext,
+            max_iterations=RLM_MAX_ITERATIONS,
+            max_llm_calls=RLM_MAX_LLM_CALLS,
+            verbose=RLM_VERBOSE,
+        )
+        pred = rlm(
+            technical_context=technical_context,
+            question=question,
+            focus=focus_text,
+        )
+    except Exception as e:
+        use_rlm = False
+        logger.warning(
+            "TechnicalAgent: RLM REPL unavailable (%s), falling back to Predict. "
+            "For full RLM (code exploration), run: uv run python -m app.scripts.setup_repl",
+            e,
+        )
+        pred = dspy.Predict(ExploreTechnicalContext)(
+            technical_context=technical_context,
+            question=question,
+            focus=focus_text,
+        )
+
     elapsed_ms = (time.perf_counter() - started_at) * 1000
-    logger.info("TechnicalAgent RLM call completed in %.1f ms", elapsed_ms)
+    logger.info(
+        "TechnicalAgent %s call completed in %.1f ms",
+        "RLM" if use_rlm else "Predict (fallback)",
+        elapsed_ms,
+    )
+    if use_rlm and pred and getattr(pred, "trajectory", None):
+        logger.debug("TechnicalAgent RLM trajectory steps: %d", len(pred.trajectory))
+    usage = None
     try:
         usage = pred.get_lm_usage()
         if usage is not None:
-            logger.debug("Technical Prediction.get_lm_usage(): %s", usage)
+            logger.debug("Technical get_lm_usage(): %s", usage)
     except Exception as e:
         logger.debug("Technical get_lm_usage not available: %s", e)
-    log_last_lm_call(caller="technical_explore")
-    logger.info("TechnicalAgent DSPy response trace (last call):")
-    dspy.inspect_history(n=1)
-    return pred.answer or "No answer could be produced from the technical context."
+    log_last_lm_call(caller="technical_rlm" if use_rlm else "technical_predict_fallback")
+    # RLM makes many LM calls (one per REPL iteration); show more history. Predict fallback = 1 call.
+    n_history = min(RLM_MAX_ITERATIONS + 2, 25) if use_rlm else 1
+    logger.info(
+        "TechnicalAgent DSPy response trace (last %d call(s)):",
+        n_history,
+    )
+    dspy.inspect_history(n=n_history)
+    log_lm_usage("technical_rlm" if use_rlm else "technical_predict_fallback", usage)
+    return pred.answer or "No answer could be produced from the technical context.", usage
 
 
 class TechnicalAgent:
@@ -257,7 +302,7 @@ class TechnicalAgent:
                 + "\n\n[Technical context truncated for length.]"
             )
 
-        evidence = _explore_with_rlm(
+        evidence, tech_usage = _explore_with_rlm(
             subquery,
             technical_context,
             focus=dataset_reasoning,
@@ -268,4 +313,5 @@ class TechnicalAgent:
             mode="technical",
             subquery=subquery,
             evidence=evidence,
+            lm_usage=tech_usage,
         )

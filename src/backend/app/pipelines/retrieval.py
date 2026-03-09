@@ -44,7 +44,7 @@ def ingest_data_gouv(
             total_ingested,
         )
         texts = [r.to_embedding_text() for r in batch_records]
-        embeddings = emb_client.embed_texts(texts)
+        embeddings, _ = emb_client.embed_texts(texts)
 
         rows = []
         for rec, content, emb in zip(batch_records, texts, embeddings):
@@ -84,8 +84,12 @@ def ingest_data_gouv(
 
 
 def search_datasets(query_text: str, k: int = 5, alpha: float = 0.5):
+    """Return (hits, embed_usage). embed_usage is for pipeline cost tracking (None if no usage)."""
     emb_client = get_embedding_client()
-    q_emb = emb_client.embed_texts([query_text])[0]
-
+    embeddings, embed_usage = emb_client.embed_texts([query_text])
+    q_emb = embeddings[0] if embeddings else None
+    if q_emb is None:
+        return [], embed_usage
     store = WeaviateStore()
-    return store.search(query_text=query_text, query_vector=q_emb, k=k, alpha=alpha)
+    hits = store.search(query_text=query_text, query_vector=q_emb, k=k, alpha=alpha)
+    return hits, embed_usage

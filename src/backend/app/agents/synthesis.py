@@ -3,7 +3,7 @@ import time
 
 import dspy
 
-from app.services.dspy_setup import configure_dspy, log_last_lm_call
+from app.services.dspy_setup import configure_dspy, log_last_lm_call, log_lm_usage
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,13 @@ class SynthesisAgent:
         )
         elapsed_ms = (time.perf_counter() - started_at) * 1000
         logger.info("SynthesisAgent LLM call completed in %.1f ms", elapsed_ms)
+        usage = None
+        try:
+            usage = result.get_lm_usage()
+        except Exception:
+            pass
         log_last_lm_call(caller="synthesis")
         logger.info("SynthesisAgent DSPy response trace (last call):")
         dspy.inspect_history(n=1)
-        return result.answer
+        log_lm_usage("synthesis", usage)
+        return result.answer, usage

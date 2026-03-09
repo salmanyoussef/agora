@@ -21,6 +21,35 @@ dependencies = [
   "unstructured[all-docs]>=0.10.0",
 ]
 
+[project.optional-dependencies]
+# RLM (Technical Agent REPL): enables DSPy RLM sandbox. Also requires Deno—run:
+#   uv run python scripts/setup_repl.py   OR   agora-setup-repl
+rlm = [
+  "tomli>=2.0; python_version<'3.11'",
+]
+
+[project.scripts]
+agora-setup-repl = "app.scripts.setup_repl:main"
+
+[tool.agora.repl]
+# Reusable REPL/RLM setup: single source of truth for Deno install.
+# Used by: app.scripts.setup_repl (agora-setup-repl).
+# System prereqs (not Python packages—install via OS package manager before running install_unix):
+system_prerequisites_unix = [
+  "unzip or 7z (Deno install script needs one to extract the binary)",
+  "Ubuntu/Debian:  sudo apt install unzip",
+  "Fedora/RHEL:    sudo dnf install unzip",
+  "Alpine:         sudo apk add unzip",
+  "macOS:          brew install unzip",
+]
+description = "Technical Agent RLM uses a sandboxed Python REPL (Deno + Pyodide). Install Deno so the REPL can run; otherwise the agent falls back to Predict."
+doc_url = "https://docs.deno.com/runtime/getting_started/installation"
+# Unix-like (macOS, Linux, WSL): run this to install Deno. Requires unzip or 7z (see above).
+install_unix = "curl -fsSL https://deno.land/install.sh | sh"
+# Windows (PowerShell): run this in an elevated shell, or use winget.
+install_windows = "irm https://deno.land/install.ps1 | iex"
+# After install, restart the shell or ensure deno is on PATH.
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"

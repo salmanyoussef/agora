@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Any
+from typing import Any, Dict, List, Optional, Tuple
 import logging
 
 from openai import AzureOpenAI
@@ -10,6 +10,24 @@ from openai import AzureOpenAI
 logger = logging.getLogger(__name__)
 
 _shared_client: Optional["AzureEmbeddingClient"] = None
+
+
+def _usage_to_dict(usage: Any) -> Optional[Dict[str, int]]:
+    """Extract prompt_tokens and total_tokens from Azure usage for pipeline cost tracking."""
+    if not usage:
+        return None
+    prompt_tokens = getattr(usage, "prompt_tokens", None)
+    if prompt_tokens is None and isinstance(usage, dict):
+        prompt_tokens = usage.get("prompt_tokens")
+    total_tokens = getattr(usage, "total_tokens", None)
+    if total_tokens is None and isinstance(usage, dict):
+        total_tokens = usage.get("total_tokens")
+    if prompt_tokens is None and total_tokens is None:
+        return None
+    return {
+        "prompt_tokens": int(prompt_tokens or 0),
+        "total_tokens": int(total_tokens or 0),
+    }
 
 
 @dataclass
@@ -31,29 +49,27 @@ class AzureEmbeddingClient:
         if not usage:
             logger.info("Azure embeddings batch completed: texts=%d", batch_size)
             return
+        d = _usage_to_dict(usage)
+        if d:
+            logger.info(
+                "Azure embeddings batch completed: texts=%d, prompt_tokens=%s, total_tokens=%s",
+                batch_size,
+                d.get("prompt_tokens"),
+                d.get("total_tokens"),
+            )
+        else:
+            logger.info("Azure embeddings batch completed: texts=%d", batch_size)
 
-        # AzureOpenAI may expose usage as attrs or as a dict; handle both.
-        prompt_tokens = getattr(usage, "prompt_tokens", None)
-        if prompt_tokens is None and isinstance(usage, dict):
-            prompt_tokens = usage.get("prompt_tokens")
-
-        total_tokens = getattr(usage, "total_tokens", None)
-        if total_tokens is None and isinstance(usage, dict):
-            total_tokens = usage.get("total_tokens")
-
-        logger.info(
-            "Azure embeddings batch completed: texts=%d, prompt_tokens=%s, total_tokens=%s",
-            batch_size,
-            prompt_tokens,
-            total_tokens,
-        )
-
-    def embed_texts(self, texts: List[str]) -> List[List[float]]:
-        # Azure OpenAI: embeddings.create(model=<deployment>, input=[...])
+    def embed_texts(self, texts: List[str]) -> Tuple[List[List[float]], Optional[Dict[str, int]]]:
+        """
+        Return (embeddings, usage_dict). usage_dict has prompt_tokens, total_tokens for pipeline cost tracking.
+        """
         logger.info("Calling Azure embeddings: texts=%d", len(texts))
         resp = self.client.embeddings.create(model=self.deployment, input=texts)
         self._log_usage(resp, batch_size=len(texts))
-        return [d.embedding for d in resp.data]
+        embeddings = [d.embedding for d in resp.data]
+        usage_dict = _usage_to_dict(getattr(resp, "usage", None))
+        return (embeddings, usage_dict)
 
     def close(self) -> None:
         """Close the underlying OpenAI client and release connections."""
