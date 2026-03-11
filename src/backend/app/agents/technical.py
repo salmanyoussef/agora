@@ -220,6 +220,12 @@ class TechnicalAgent:
                     resource = item.get("resource")
                     if not url:
                         continue
+                    # If embedded resource has no size, fetch full resource from API for pre-download size check.
+                    if resource is not None and resource.get("size") is None and resource.get("id"):
+                        try:
+                            resource = client.get_resource(dataset_id, str(resource["id"]))
+                        except Exception as e:
+                            logger.debug("TechnicalAgent: get_resource failed for rid=%s: %s", resource.get("id"), e)
                     resource_id = f"{dataset_id}_{res_idx}"
                     metadata_str = _resource_metadata_str(ds, resource, url)
                     try:

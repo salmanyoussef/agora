@@ -115,6 +115,15 @@ class DataGouvDatasetsClient:
         logger.info("Fetching dataset: dataset_id=%s", dataset_id)
         return self._get_json_with_retry(url)
 
+    def get_resource(self, dataset_id: str, resource_id: str) -> Dict[str, Any]:
+        """
+        Fetch a single resource by dataset ID and resource ID (rid).
+        Uses GET /datasets/{dataset}/resources/{rid}/ so full metadata (e.g. size) is available.
+        See: https://guides.data.gouv.fr/api-de-data.gouv.fr/reference/datasets
+        """
+        url = f"{self.base_url.rstrip('/')}/{dataset_id}/resources/{resource_id}/"
+        return self._get_json_with_retry(url)
+
     def fetch_page(
         self,
         page: int = 1,

@@ -6,6 +6,8 @@ from app.services.dspy_setup import (
     estimate_and_log_pipeline_cost,
     format_embed_usage,
     format_lm_usage,
+    get_embedding_cost_append,
+    get_llm_cost_append,
     merge_embed_usage,
     merge_lm_usage,
 )
@@ -19,6 +21,7 @@ from app.pipelines.retrieval import search_datasets
 
 from app.models.agent_response import AgentResponse
 from app.models.dataset_selection import SelectedDataset
+from app.models.execution_result import ExecutionResult
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +54,21 @@ def _stream_run(
 ):
     """Generator that runs the orchestrator and yields SSE-style events in real time.
     use_only_general_agent: if True, RAG only; if False, RAG + technical; if None, use USE_ONLY_GENERAL_AGENT.
+    On any unhandled exception, yields an error event so the client gets a message and the process stays up.
     """
+    try:
+        yield from _stream_run_impl(orchestrator, question, k, use_only_general_agent)
+    except Exception as e:
+        logger.exception("Pipeline stream failed: %s", e)
+        yield {"event": "error", "message": f"Pipeline error: {e!s}"}
+
+
+def _stream_run_impl(
+    orchestrator: "AgentOrchestrator",
+    question: str,
+    k: int,
+    use_only_general_agent: bool | None,
+):
     use_rag_only = use_only_general_agent if use_only_general_agent is not None else USE_ONLY_GENERAL_AGENT
     yield {"event": "status", "message": "Planning your question…"}
     plan = orchestrator.planner.run(question)
@@ -123,23 +140,41 @@ def _stream_run(
                     if did and did not in seen_dataset_ids:
                         seen_dataset_ids.add(did)
                         used_dataset_refs.append(ref)
-                    if use_rag_only:
-                        result = orchestrator.general_agent.run(
-                            sub.question, [hit], dataset_reasoning=sel.reasoning or ""
+                    try:
+                        if use_rag_only:
+                            result = orchestrator.general_agent.run(
+                                sub.question, [hit], dataset_reasoning=sel.reasoning or ""
+                            )
+                        elif sel.execution_mode == "rag":
+                            result = orchestrator.general_agent.run(
+                                sub.question, [hit], dataset_reasoning=sel.reasoning or ""
+                            )
+                        else:
+                            result = orchestrator.technical_agent.run(
+                                sub.question, [hit], dataset_reasoning=sel.reasoning or ""
+                            )
+                        evidence_blocks.append(result)
+                        if getattr(result, "lm_usage", None):
+                            usage_records_stream.append(result.lm_usage)
+                        if getattr(result, "embed_usage", None):
+                            embed_usage_records_stream.append(result.embed_usage)
+                    except Exception as run_err:
+                        logger.warning(
+                            "Dataset run failed (skipping): %s — %s",
+                            title[:60] if title else hit.get("dataset_id"),
+                            run_err,
+                            exc_info=True,
                         )
-                    elif sel.execution_mode == "rag":
-                        result = orchestrator.general_agent.run(
-                            sub.question, [hit], dataset_reasoning=sel.reasoning or ""
+                        evidence_blocks.append(
+                            ExecutionResult(
+                                mode="rag",
+                                subquery=sub.question,
+                                evidence=f"[Skipped: error processing this dataset — {run_err!s}]",
+                                lm_usage=None,
+                                embed_usage=None,
+                            )
                         )
-                    else:
-                        result = orchestrator.technical_agent.run(
-                            sub.question, [hit], dataset_reasoning=sel.reasoning or ""
-                        )
-                    evidence_blocks.append(result)
-                    if getattr(result, "lm_usage", None):
-                        usage_records_stream.append(result.lm_usage)
-                    if getattr(result, "embed_usage", None):
-                        embed_usage_records_stream.append(result.embed_usage)
+                        yield {"event": "user_message", "message": f"Skipped «{title}» due to error."}
 
         except Exception as e:
             logger.warning("Dataset selector failed, using raw hits. Error: %s", e)
@@ -177,12 +212,20 @@ def _stream_run(
     if synthesis_usage is not None:
         usage_records_stream.append(synthesis_usage)
     grand_total_stream = merge_lm_usage(usage_records_stream)
-    logger.info("LLM usage [PIPELINE GRAND TOTAL] (stream): %s", format_lm_usage(grand_total_stream))
+    logger.info(
+        "LLM usage [PIPELINE GRAND TOTAL] (stream): %s%s",
+        format_lm_usage(grand_total_stream),
+        get_llm_cost_append(grand_total_stream),
+    )
     estimate_and_log_pipeline_cost(grand_total_stream)
 
     embed_grand_total_stream = merge_embed_usage(embed_usage_records_stream)
     if embed_grand_total_stream.get("total_tokens"):
-        logger.info("Embedding usage [PIPELINE GRAND TOTAL] (stream): %s", format_embed_usage(embed_grand_total_stream))
+        logger.info(
+            "Embedding usage [PIPELINE GRAND TOTAL] (stream): %s%s",
+            format_embed_usage(embed_grand_total_stream),
+            get_embedding_cost_append(embed_grand_total_stream),
+        )
         estimate_and_log_embedding_cost(embed_grand_total_stream)
 
     response = AgentResponse(
@@ -384,12 +427,20 @@ class AgentOrchestrator:
             usage_records.append(synthesis_usage)
 
         grand_total = merge_lm_usage(usage_records)
-        logger.info("LLM usage [PIPELINE GRAND TOTAL]: %s", format_lm_usage(grand_total))
+        logger.info(
+            "LLM usage [PIPELINE GRAND TOTAL]: %s%s",
+            format_lm_usage(grand_total),
+            get_llm_cost_append(grand_total),
+        )
         estimate_and_log_pipeline_cost(grand_total)
 
         embed_grand_total = merge_embed_usage(embed_usage_records)
         if embed_grand_total.get("total_tokens"):
-            logger.info("Embedding usage [PIPELINE GRAND TOTAL]: %s", format_embed_usage(embed_grand_total))
+            logger.info(
+                "Embedding usage [PIPELINE GRAND TOTAL]: %s%s",
+                format_embed_usage(embed_grand_total),
+                get_embedding_cost_append(embed_grand_total),
+            )
             estimate_and_log_embedding_cost(embed_grand_total)
 
         return AgentResponse(

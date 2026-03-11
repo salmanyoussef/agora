@@ -527,6 +527,10 @@
               if (data.event === "status" && data.message) appendStreamMessage(data.message, "status");
               else if (data.event === "plan" && data.plan) { /* no progress line for plan */ }
               else if (data.event === "user_message" && data.message) appendStreamMessage(data.message, "user_message");
+              else if (data.event === "error" && data.message) {
+                appendStreamMessage("Error: " + data.message, "error");
+                appendStreamMessage("Check the backend terminal for details.", "error");
+              }
               else if (data.event === "done" && data.response) {
                 const r = data.response;
                 setAnswer(r.answer || "");

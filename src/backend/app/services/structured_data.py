@@ -24,6 +24,14 @@ STRUCTURED_EXTENSIONS = TABULAR_EXTENSIONS | RECORDS_EXTENSIONS
 
 # Max rows to load per resource (avoid huge datasets in memory).
 DEFAULT_MAX_ROWS = 10_000
+# Max columns to keep for tabular data (avoids OOM and timeouts on very wide CSVs).
+MAX_TABULAR_COLUMNS = 150
+# Max file size (bytes) for JSON/GeoJSON before we refuse to load (avoids OOM on huge geo files).
+MAX_JSON_FILE_BYTES = 25 * 1024 * 1024  # 25 MB (full load into memory).
+# Max file size (bytes) for Excel (.xlsx/.xls); openpyxl can use ~50× file size in RAM—keep conservative.
+MAX_EXCEL_FILE_BYTES = 25 * 1024 * 1024  # 25 MB
+# Max file size (bytes) for CSV/TSV; we only load first 150 cols + max_rows so file can be larger on disk.
+MAX_CSV_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
 # Rows to include in technical context preview for the LLM.
 DEFAULT_PREVIEW_ROWS = 50
 
@@ -97,10 +105,65 @@ def _parse_tabular(
     max_rows: int,
     ext: str,
 ) -> ParsedData:
+    try:
+        file_size = os.path.getsize(path)
+    except OSError:
+        file_size = 0
+
+    if ext in (".xlsx", ".xls"):
+        if file_size > MAX_EXCEL_FILE_BYTES:
+            logger.warning(
+                "Excel file too large to parse safely: %s (%d MB); skipping to avoid OOM",
+                path,
+                file_size // (1024 * 1024),
+            )
+            return ParsedData(
+                records=[],
+                columns=[],
+                row_count=0,
+                format=ext.lstrip("."),
+                schema_summary=f"(Excel file too large: {file_size // (1024*1024)} MB; skipped)",
+            )
+    elif ext in (".csv", ".tsv"):
+        if file_size > MAX_CSV_FILE_BYTES:
+            logger.warning(
+                "CSV/TSV file too large to parse safely: %s (%d MB); skipping to avoid OOM",
+                path,
+                file_size // (1024 * 1024),
+            )
+            return ParsedData(
+                records=[],
+                columns=[],
+                row_count=0,
+                format=ext.lstrip("."),
+                schema_summary=f"(CSV/TSV file too large: {file_size // (1024*1024)} MB; skipped)",
+            )
+
+    read_csv_kw: dict = {
+        "nrows": max_rows,
+        "encoding": "utf-8",
+        "on_bad_lines": "skip",
+        "low_memory": False,
+    }
     if ext == ".csv":
-        df = pd.read_csv(path, nrows=max_rows, encoding="utf-8", on_bad_lines="skip")
+        # Read only first N columns from the start so we never load 700+ columns into memory.
+        try:
+            header_df = pd.read_csv(path, nrows=0, encoding="utf-8", on_bad_lines="skip")
+            ncols = len(header_df.columns)
+            usecols = list(range(min(MAX_TABULAR_COLUMNS, ncols)))
+            read_csv_kw["usecols"] = usecols
+        except Exception as e:
+            logger.debug("Could not get CSV header for usecols, reading all columns: %s", e)
+        df = pd.read_csv(path, **read_csv_kw)
     elif ext == ".tsv":
-        df = pd.read_csv(path, sep="\t", nrows=max_rows, encoding="utf-8", on_bad_lines="skip")
+        try:
+            header_df = pd.read_csv(path, nrows=0, sep="\t", encoding="utf-8", on_bad_lines="skip")
+            ncols = len(header_df.columns)
+            usecols = list(range(min(MAX_TABULAR_COLUMNS, ncols)))
+            read_csv_kw["usecols"] = usecols
+        except Exception as e:
+            logger.debug("Could not get TSV header for usecols, reading all columns: %s", e)
+        df = pd.read_csv(path, sep="\t", **read_csv_kw)
     elif ext == ".xlsx":
         df = pd.read_excel(path, nrows=max_rows, engine="openpyxl")
     elif ext == ".xls":
@@ -112,10 +175,19 @@ def _parse_tabular(
             logger.warning("read_excel .xls failed for %s: %s", path, e)
             raise ValueError(f"Cannot read .xls file: {path}") from e
     else:
-        df = pd.read_csv(path, nrows=max_rows, encoding="utf-8", on_bad_lines="skip")
+        df = pd.read_csv(path, **read_csv_kw)
 
     df = df.dropna(axis=1, how="all")
     columns = [str(c) for c in df.columns]
+    # Fallback if usecols wasn't used (e.g. other tabular ext): cap columns after read.
+    if len(columns) > MAX_TABULAR_COLUMNS:
+        logger.info(
+            "Tabular resource has %d columns; keeping first %d to avoid OOM/slowness",
+            len(columns),
+            MAX_TABULAR_COLUMNS,
+        )
+        df = df.iloc[:, :MAX_TABULAR_COLUMNS]
+        columns = [str(c) for c in df.columns]
     records = df.to_dict(orient="records")
     # Coerce non-serializable types for JSON preview
     for r in records:
@@ -217,6 +289,25 @@ def _parse_records(
                 row_count=len(records),
                 format="jsonl",
                 schema_summary=schema_summary,
+            )
+
+        # JSON/GeoJSON: load entire file into memory — skip if too large (avoids OOM on big geo files)
+        try:
+            file_size = os.path.getsize(path)
+        except OSError:
+            file_size = 0
+        if file_size > MAX_JSON_FILE_BYTES:
+            logger.warning(
+                "JSON/GeoJSON file too large to parse safely: %s (%d MB); skipping to avoid OOM",
+                path,
+                file_size // (1024 * 1024),
+            )
+            return ParsedData(
+                records=[],
+                columns=[],
+                row_count=0,
+                format=ext.lstrip("."),
+                schema_summary=f"(file too large: {file_size // (1024*1024)} MB; skipped)",
             )
 
         raw = json.load(f)

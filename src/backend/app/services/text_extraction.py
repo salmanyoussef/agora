@@ -43,7 +43,24 @@ from pypdf import PdfReader
 
 logger = logging.getLogger(__name__)
 DEFAULT_DOWNLOAD_RETRY_ATTEMPTS = 3
+# Max size (bytes) for JSON/GeoJSON before we skip full load (avoids OOM on huge geo files).
+MAX_JSON_FILE_BYTES = 25 * 1024 * 1024  # 25 MB (full load; moderate increase from 10 MB).
+# Max size (bytes) for any file passed to unstructured (DOCX, XLSX, ZIP, XML, etc.); larger files are skipped.
+MAX_UNSTRUCTURED_FILE_BYTES = 80 * 1024 * 1024  # 80 MB (doc pipelines often allow up to ~100 MB).
+# Max size (bytes) for CSV before we skip (we only load nrows+usecols so file can be larger on disk).
+MAX_CSV_FILE_BYTES = 100 * 1024 * 1024  # 100 MB (bounded by row/column caps in parsing).
+# Max characters to read from plain-text / unknown files (avoids loading huge files into memory).
+MAX_TEXT_READ_CHARS = 200_000
+# Max size (bytes) to allow for download; must be >= largest post-download limit so we don't block then refuse.
+MAX_DOWNLOAD_FILE_BYTES = 100 * 1024 * 1024  # 100 MB
 DEFAULT_DOWNLOAD_RETRY_BACKOFF_S = 1.5
+
+
+class ResourceTooLargeError(RuntimeError):
+    """Raised when Content-Length from HEAD exceeds MAX_DOWNLOAD_FILE_BYTES."""
+    def __init__(self, message: str, content_length: Optional[int] = None):
+        super().__init__(message)
+        self.content_length = content_length
 
 # Map data.gouv resource "format" / mime to file extension (lowercase, with leading dot).
 # Used when the server does not provide a filename so we still save with the right extension.
@@ -173,6 +190,22 @@ def _guess_extension_from_content(path: str) -> Optional[str]:
     return f".{ext}" if ext and not ext.startswith(".") else (f".{ext}" if ext else None)
 
 
+def _get_content_length_head(url: str, timeout_s: int = 60) -> Optional[int]:
+    """
+    Perform a HEAD request and return Content-Length if present and valid.
+    Returns None if HEAD fails, is not supported, or Content-Length is missing/chunked.
+    """
+    try:
+        resp = requests.head(url, allow_redirects=True, timeout=timeout_s)
+        resp.raise_for_status()
+        raw = resp.headers.get("Content-Length")
+        if raw is None:
+            return None
+        return int(raw)
+    except (requests.RequestException, ValueError):
+        return None
+
+
 def download_file(
     url: str,
     out_dir: str,
@@ -184,6 +217,11 @@ def download_file(
     """
     Download URL to out_dir; return local path. Retries transient request errors.
 
+    Size checks (raise ResourceTooLargeError without downloading if over MAX_DOWNLOAD_FILE_BYTES):
+    1. If resource= is provided and has a "size" field (e.g. from data.gouv.fr API), use that first (no network).
+    2. Else HEAD request for Content-Length; if present and over limit, skip download.
+    When no size is available, proceeds with download; post-download size checks apply in extraction/parsing.
+
     Filename/extension is chosen in this order:
     1. Content-Disposition header (if present)
     2. URL path
@@ -191,6 +229,44 @@ def download_file(
     4. Content-Type header (mimetypes)
     5. After download: content-based guess (filetype) if still no extension
     """
+    # Layer 1: API-reported size (data.gouv.fr and compatible APIs send resource.size in bytes).
+    if resource is not None:
+        raw_size = resource.get("size")
+        if raw_size is not None:
+            try:
+                api_size = int(raw_size)
+                if api_size > 0 and api_size > MAX_DOWNLOAD_FILE_BYTES:
+                    size_mb = api_size // (1024 * 1024)
+                    logger.warning(
+                        "Skipping download: API resource size %d bytes (%d MB) exceeds max %d MB for %s",
+                        api_size,
+                        size_mb,
+                        MAX_DOWNLOAD_FILE_BYTES // (1024 * 1024),
+                        url[:80] + ("..." if len(url) > 80 else ""),
+                    )
+                    raise ResourceTooLargeError(
+                        f"Resource too large: API size {api_size} bytes ({size_mb} MB); max {MAX_DOWNLOAD_FILE_BYTES // (1024*1024)} MB",
+                        content_length=api_size,
+                    )
+            except (TypeError, ValueError):
+                pass
+
+    # Layer 2: HEAD request for Content-Length (when API size not available or under limit).
+    content_length = _get_content_length_head(url, timeout_s=timeout_s)
+    if content_length is not None and content_length > MAX_DOWNLOAD_FILE_BYTES:
+        size_mb = content_length // (1024 * 1024)
+        logger.warning(
+            "Skipping download: Content-Length %d bytes (%d MB) exceeds max %d MB for %s",
+            content_length,
+            size_mb,
+            MAX_DOWNLOAD_FILE_BYTES // (1024 * 1024),
+            url[:80] + ("..." if len(url) > 80 else ""),
+        )
+        raise ResourceTooLargeError(
+            f"Resource too large: Content-Length {content_length} bytes ({size_mb} MB); max {MAX_DOWNLOAD_FILE_BYTES // (1024*1024)} MB",
+            content_length=content_length,
+        )
+
     os.makedirs(out_dir, exist_ok=True)
 
     last_exc: Exception | None = None
@@ -285,7 +361,19 @@ def _extract_with_unstructured(path: str, max_chars: int = 200_000) -> Optional[
     """
     Extract text using the unstructured library if available. Returns None if
     the library is not installed, the format is not supported, or extraction fails.
+    Skips files larger than MAX_UNSTRUCTURED_FILE_BYTES to avoid OOM (DOCX, XLSX, ZIP, XML, etc.).
     """
+    try:
+        file_size = os.path.getsize(path)
+    except OSError:
+        file_size = 0
+    if file_size > MAX_UNSTRUCTURED_FILE_BYTES:
+        logger.warning(
+            "File too large for unstructured extraction: %s (%d MB); skipping",
+            path,
+            file_size // (1024 * 1024),
+        )
+        return None
     try:
         from unstructured.partition.auto import partition
     except ImportError:
@@ -427,13 +515,40 @@ def extract_text_from_file(
             return f"[PDF extraction failed: {os.path.basename(path)}]"
 
     # Try unstructured first for all other files (CSV, DOCX, XLSX, HTML, XML, etc.; PDFs handled above)
-    unstructured_out = _extract_with_unstructured(path, max_chars=200_000)
+    # Skip unstructured for large JSON/GeoJSON to avoid OOM before we hit the size-checked fallback.
+    unstructured_out = None
+    if lower.endswith(".json") or lower.endswith(".geojson"):
+        try:
+            if os.path.getsize(path) <= MAX_JSON_FILE_BYTES:
+                unstructured_out = _extract_with_unstructured(path, max_chars=200_000)
+        except OSError:
+            unstructured_out = _extract_with_unstructured(path, max_chars=200_000)
+    else:
+        unstructured_out = _extract_with_unstructured(path, max_chars=200_000)
     if unstructured_out:
         return unstructured_out
 
     # Fallback: our own handling for CSV/JSON/JSONL (to respect max_rows) and simple text/PDF
     if lower.endswith(".csv"):
-        df = pd.read_csv(path, nrows=max_rows)
+        try:
+            file_size = os.path.getsize(path)
+            if file_size > MAX_CSV_FILE_BYTES:
+                logger.warning(
+                    "CSV file too large for text extraction: %s (%d MB); skipping",
+                    path,
+                    file_size // (1024 * 1024),
+                )
+                return f"[CSV file too large for extraction ({file_size // (1024*1024)} MB); skipped to avoid OOM.]"
+        except OSError:
+            logger.warning("Could not get CSV file size for %s; skipping read to avoid OOM risk.", path)
+            return "[CSV file size could not be determined; skipped for safety.]"
+        try:
+            df = pd.read_csv(path, nrows=max_rows, encoding="utf-8", on_bad_lines="skip")
+        except Exception as e:
+            logger.warning("CSV read failed for %s: %s", path, e)
+            return f"[CSV could not be parsed: {e!s}]"
+        if df.empty:
+            return "[CSV preview: no rows could be parsed.]"
         return f"[CSV preview: first {len(df)} rows]\n" + df.to_csv(index=False)
 
     if lower.endswith(".json") or lower.endswith(".jsonl") or lower.endswith(".geojson"):
@@ -445,6 +560,19 @@ def extract_text_from_file(
                         break
                     lines.append(line.strip())
             return "[JSONL preview]\n" + "\n".join(lines)
+        try:
+            file_size = os.path.getsize(path)
+        except OSError:
+            file_size = 0
+        if file_size > MAX_JSON_FILE_BYTES:
+            logger.warning(
+                "JSON/GeoJSON file too large for text extraction: %s (%d MB); skipping",
+                path,
+                file_size // (1024 * 1024),
+            )
+            return (
+                f"[JSON/GeoJSON file too large for extraction ({file_size // (1024*1024)} MB); skipped to avoid OOM.]"
+            )
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             obj = json.load(f)
         txt = json.dumps(obj, ensure_ascii=False, indent=2)
@@ -452,10 +580,10 @@ def extract_text_from_file(
 
     if lower.endswith(".txt") or lower.endswith(".md"):
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
-            return f.read()[:200_000]
+            return f.read(MAX_TEXT_READ_CHARS)
 
     try:
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
-            return f.read()[:200_000]
+            return f.read(MAX_TEXT_READ_CHARS)
     except Exception:
         return f"[Unsupported binary format for text extraction: {os.path.basename(path)}]"
