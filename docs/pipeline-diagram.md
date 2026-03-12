@@ -122,6 +122,22 @@ sequenceDiagram
 | **SynthesisAgent** | `question`, `evidence` (concatenated blocks), `context` | `(answer: str, lm_usage)` |
 | **Orchestrator** | `question`, `k`, `use_only_general_agent` | `AgentResponse` (answer, plan, evidence[], hits, user_messages, lm_usage_grand_total, embed_usage_grand_total) |
 
+## Indented pipeline summary
+
+```text
+Question
+→ Planner (generates subqueries)
+→ per subquery:
+    search_datasets (top‑k hits from hybrid retrieval)
+    → DatasetSelector:
+        - decides which datasets are worth keeping (if any)
+        - decides whether the General or Technical agent should be used for each
+    → GeneralAgent or TechnicalAgent called per selected dataset → evidence
+→ concatenate evidence from all General/Technical agent calls
+→ SynthesisAgent uses evidence to form the final answer
+→ AgentResponse (answer, plan, evidence, usage).
+```
+
 ## One-line pipeline summary
 
 **Question → Planner (subqueries) → [per subquery: search_datasets (hits) → DatasetSelector (rag/technical per dataset) → GeneralAgent or TechnicalAgent (evidence)] → concatenate evidence → SynthesisAgent (answer) → AgentResponse.**
