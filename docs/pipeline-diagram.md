@@ -140,4 +140,4 @@ Question
 
 ## One-line pipeline summary
 
-**Question → Planner (subqueries) → [per subquery: search_datasets (hits) → DatasetSelector (rag/technical per dataset) → GeneralAgent or TechnicalAgent (evidence)] → concatenate evidence → SynthesisAgent (answer) → AgentResponse.**
+**Question → Planner (subqueries) → [per subquery: search_datasets (top-k hits) → DatasetSelector (selects which of the top-k to keep; assigns rag or technical for each) → GeneralAgent or TechnicalAgent (evidence)] → concatenate evidence → SynthesisAgent (answer) → AgentResponse.**
