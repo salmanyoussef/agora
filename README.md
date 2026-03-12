@@ -55,4 +55,4 @@ Design: prototype in `notebooks/`, then refactor into production modules in `src
 
 ## License
 
-Copyright © 2026 Salman Youssef. This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
