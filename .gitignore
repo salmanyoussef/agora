@@ -28,3 +28,6 @@ build/
 *.pytest_cache/
 .ruff_cache/
 weaviate_data/
+
+# Paper helpers / build artifacts
+docs/paper/PROMPT_FOR_REFERENCE_SEARCH.md
