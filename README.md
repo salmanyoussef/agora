@@ -2,6 +2,8 @@
 
 **Agora** is a question-answering pipeline over French open government data ([data.gouv.fr](https://www.data.gouv.fr)). You ask a question in natural language; Agora plans subqueries, searches the dataset catalogue, selects relevant datasets, retrieves and extracts content (RAG or technical), and synthesizes a single, attributed answer.
 
+**Framework intent.** This repository is meant to serve as a **reusable baseline** for other scholarly work and projects that use open government data (OGD): the same **systemic, agentic** pattern---planner, hybrid catalogue search, selector, dual evidence paths, synthesis---can be re-targeted to other national or regional portals, extended with new agents or evaluations, or adapted for accessibility-focused deployments. The goal is easier, more **accessible** access to open data through grounded natural-language interfaces, not a one-off demo tied to a single catalogue.
+
 ---
 
 ## What Agora does

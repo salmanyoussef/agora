@@ -1,0 +1,39 @@
+% Orchestrator-centric sequence (swimlanes).
+\begin{tikzpicture}[
+  font=\scriptsize\sffamily,
+  >=Stealth,
+  arr/.style={->, line width=0.45pt, black!68},
+  life/.style={dashed, gray!42, line width=0.32pt}
+]
+
+  \node at (0, 0.32) {User};
+  \node at (1.85, 0.32) {Orch.};
+  \node at (3.2, 0.32) {Plan};
+  \node at (4.55, 0.32) {Srch};
+  \node at (5.9, 0.32) {Sel.};
+  \node at (7.25, 0.32) {\shortstack{GA/\\TA}};
+  \node at (8.6, 0.32) {Syn};
+
+  \foreach \x in {0, 1.85, 3.2, 4.55, 5.9, 7.25, 8.6} {
+    \draw[life] (\x, 0.18) -- (\x, -3.85);
+  }
+
+  \draw[arr] (0, -0.5) -- node[above=1pt, font=\tiny] {question} (1.85, -0.5);
+  \draw[arr] (1.85, -0.8) -- node[above=1pt, font=\tiny] {plan} (3.2, -0.8);
+  \draw[arr] (3.2, -1.1) -- node[above=1pt, font=\tiny] {ok} (1.85, -1.1);
+
+  \draw[arr] (1.85, -1.45) -- node[above=1pt, font=\tiny] {search} (4.55, -1.45);
+  \draw[arr] (4.55, -1.75) -- node[above=1pt, font=\tiny] {hits} (1.85, -1.75);
+
+  \draw[arr] (1.85, -2.1) -- node[above=1pt, font=\tiny] {select} (5.9, -2.1);
+  \draw[arr] (5.9, -2.4) -- node[above=1pt, font=\tiny] {modes} (1.85, -2.4);
+
+  \draw[arr] (1.85, -2.75) -- node[above=1pt, font=\tiny] {run} (7.25, -2.75);
+  \draw[arr] (7.25, -3.05) -- node[above=1pt, font=\tiny] {evidence} (1.85, -3.05);
+
+  \draw[arr] (1.85, -3.4) -- node[above=1pt, font=\tiny] {synth.} (8.6, -3.4);
+  \draw[arr] (8.6, -3.7) -- node[above=1pt, font=\tiny] {answer} (0, -3.7);
+
+  \node[font=\tiny, text=gray!68, anchor=west] at (0, -4.05) {$\cdots$ per subquery / dataset};
+
+\end{tikzpicture}

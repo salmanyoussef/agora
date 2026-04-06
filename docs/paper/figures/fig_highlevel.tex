@@ -1,0 +1,41 @@
+% High-level: batch ingestion vs runtime.
+% Return legs use separate vertical offsets so step numbers never share one path.
+\begin{tikzpicture}[
+  font=\scriptsize\sffamily,
+  node distance=0.35cm,
+  box/.style={draw, rounded corners=2pt, inner sep=2.2pt, align=center, minimum height=0.52cm},
+  arrY/.style={-{Stealth[length=1.6mm]}, line width=0.5pt, orange!85!black},
+  arrB/.style={-{Stealth[length=1.6mm]}, line width=0.5pt, blue!65!black}
+]
+  % --- Ingestion (batch) ---
+  \node[box, fill=yellow!15] (ing) {$\sim$70k records};
+  \node[box, fill=yellow!15, right=of ing] (em) {Embedding};
+  \node[box, fill=yellow!15, right=of em] (vdb) {Vector DB};
+  \draw[arrY] (ing) -- (em) -- (vdb);
+  \node[above=0.08cm of em, font=\tiny, text=gray] {(batch)};
+
+  % --- Runtime row ---
+  \node[box, fill=blue!8, below=0.95cm of ing] (ui) {UI};
+  \node[box, fill=blue!8, right=of ui] (be) {Backend};
+  \node[box, fill=blue!8, right=of be] (w2) {Vector DB};
+  \node[box, fill=blue!8, right=of w2] (fr) {Portal API};
+  \node[box, fill=blue!8, right=of fr] (gpt) {LLM};
+
+  % 1 / 8: UI <-> Backend (parallel offsets so request and response do not overlap)
+  \draw[arrB] ($(ui.east)+(0,1.6pt)$) -- node[above, font=\tiny, inner sep=1.2pt, pos=0.5] {1} ($(be.west)+(0,1.6pt)$);
+  \draw[arrB] ($(be.west)+(0,-1.6pt)$) -- node[below, font=\tiny, inner sep=1.2pt, pos=0.5] {8} ($(ui.east)+(0,-1.6pt)$);
+
+  % 2 / 3: Backend <-> Vector DB (adjacent): parallel offsets
+  \draw[arrB] ($(be.east)+(0,1.6pt)$) -- node[above, font=\tiny, inner sep=1.2pt, pos=0.5] {2} ($(w2.west)+(0,1.6pt)$);
+  \draw[arrB] ($(w2.west)+(0,-1.6pt)$) -- node[below, font=\tiny, inner sep=1.2pt, pos=0.5] {3} ($(be.east)+(0,-1.6pt)$);
+
+  % 4 / 5: Backend <-> Portal (non-adjacent): routed above / below row
+  \draw[arrB] ($(be.east)+(0,0.38)$) -- node[above, font=\tiny, inner sep=1.2pt, pos=0.55] {4} ($(fr.west)+(0,0.38)$);
+  \draw[arrB] ($(fr.west)+(0,-0.38)$) -- node[below, font=\tiny, inner sep=1.2pt, pos=0.45] {5} ($(be.east)+(0,-0.38)$);
+
+  % 6 / 7: Backend <-> LLM (longer hop): higher / lower lanes
+  \draw[arrB] ($(be.east)+(0,0.62)$) -- node[above, font=\tiny, inner sep=1.2pt, pos=0.58] {6} ($(gpt.west)+(0,0.62)$);
+  \draw[arrB] ($(gpt.west)+(0,-0.62)$) -- node[below, font=\tiny, inner sep=1.2pt, pos=0.42] {7} ($(be.east)+(0,-0.62)$);
+
+  \draw[dashed, gray!55] (vdb.south) -- ++(0,-0.15) -| (w2.north);
+\end{tikzpicture}

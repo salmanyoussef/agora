@@ -2,6 +2,8 @@
 
 This diagram reflects the current setup in `src/backend/app/agents/orchestrator.py` and related agents.
 
+**Paper:** IEEE-style TikZ figures in `docs/paper/figures/` summarize the same flows for `agora_paper.tex`; this Mermaid file remains the editable source of truth for detailed layout.
+
 ## Mermaid flowchart
 
 ```mermaid
