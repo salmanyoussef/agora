@@ -31,3 +31,5 @@ weaviate_data/
 
 # Paper helpers / build artifacts
 docs/paper/PROMPT_FOR_REFERENCE_SEARCH.md
+# Paper (LaTeX, figures, bibliography — keep local; do not commit) - remove when published
+docs/paper/
