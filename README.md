@@ -1,26 +1,55 @@
 # Agora
 
-**Agora** is a question-answering pipeline over French open government data ([data.gouv.fr](https://www.data.gouv.fr)). You ask a question in natural language; Agora plans subqueries, searches the dataset catalogue, selects relevant datasets, retrieves and extracts content (RAG or technical), and synthesizes a single, attributed answer.
+**Agora** implements the **AGORA protocol**: a fixed, auditable pipeline from a natural-language **question** to a single **grounded answer** over a national open-data **catalogue** ([data.gouv.fr](https://www.data.gouv.fr)). This README summarizes the *scientific* view (objects, stages, state); runbooks and APIs live under **`src/`**.
 
-**Framework intent.** This repository is meant to serve as a **reusable baseline** for other scholarly work and projects that use open government data (OGD): the same **systemic, agentic** pattern---planner, hybrid catalogue search, selector, dual evidence paths, synthesis---can be re-targeted to other national or regional portals, extended with new agents or evaluations, or adapted for accessibility-focused deployments. The goal is easier, more **accessible** access to open data through grounded natural-language interfaces, not a one-off demo tied to a single catalogue.
+**Framework intent.** The same staged pattern can be re-targeted to other API-backed portals: swap ingestion and prompts, keep the protocol shape. The goal is **accessible**, **source-attributed** access to open government data, not a one-off demo.
 
 ---
 
-## What Agora does
+## The AGORA protocol (formal view)
 
-- **Plan** — Splits your question into intent and subqueries.
-- **Search** — Hybrid (vector + keyword) search over indexed dataset metadata (Weaviate).
-- **Select** — Per-dataset choice of RAG vs technical extraction (when Technical mode is enabled).
-- **Answer** — For each selected dataset: download resources, then either **RAG only** (General mode) or **RAG + technical per resource** (Technical mode); finally **synthesize** one answer with clear source attribution.
+**Objects.**
 
-Embeddings use **Azure OpenAI**; the chat/synthesis model is configured via DSPy (Azure OpenAI chat). Vectors are stored in **Weaviate** (self-hosted, BYOV).
+| Symbol | Meaning |
+|--------|---------|
+| **D** | Finite set of **dataset identifiers** exposed by the portal catalogue. |
+| **I** | **Indexed catalogue**: metadata records with dense + lexical (hybrid) features for search. |
+| **Q** | User **question** (natural language). |
 
-### General vs Technical mode (frontend)
+A **run** maps **Q → A** (final answer) in **five stages** with a single orchestrator—no ad hoc message graph between agents.
 
-The UI lets you choose **General** or **Technical** before submitting a question:
+**Stages (control flow).**
 
-- **General** — The pipeline uses **only RAG**: download → extract text → chunk → embed → semantic retrieval → LLM answer. No RLM (reasoning language model), no technical/computation path. Best when you want a quick, document-style answer from dataset contents.
-- **Technical** — The pipeline uses **both** general and technical analysis **per resource**: for each relevant dataset/resource, the **dataset selector** decides whether to run **RAG** (general) or **technical** extraction. Technical resources are parsed into structured data (tables/records), explored via an RLM (sandboxed Python REPL), and can include fallback text extraction for non-structured files (e.g. PDFs). So by choosing Technical, you get the best of both: RAG where a sample of text is enough, and structured exploration + computation where the data is tabular or record-based.
+1. **Plan.** Produce a plan **P = (ι, {q₁,…,qₖ})**: intent **ι** and retrieval-oriented **subqueries** **qₗ** (often **k = 1**).
+2. **Retrieve.** For each **ℓ**, hybrid search over **I** returns ranked hits **Hₗ ⊆ D** (scores + metadata). Hits may be deduplicated across **ℓ**.
+3. **Select.** Output **S = {(d, m_d, r_d)}** where **d ∈ D**, **m_d ∈ {RAG, TECH}**, optional rationale **r_d**. Possibly **S = ∅** if nothing is relevant.
+4. **Execute evidence.** For each **(d, m_d) ∈ S**, download portal resources for **d**, extract content, and form an evidence block **e_d** (passage-style for **RAG**, structured / tool-assisted for **TECH**).
+5. **Synthesize.** Map **(Q, P, {e_d}, refs(S)) → A**: one answer with citations, using portal titles and URLs from **refs(S)**.
+
+**Coordination vs cognition.**
+
+- **Agents reason** — Planner, selector, General, Technical, and synthesis each apply their own policy (LLM and/or tools) to local inputs and emit typed artifacts (plans, **S**, evidence blocks).
+- **Protocol coordinates** — The orchestrator enforces order, deduplicates hits across subqueries, routes each **d** to **RAG** or **TECH**, merges evidence in a **fixed order**, and forwards citation fields so **A** points to real catalogue rows.
+
+**Protocol state (between stages).**  
+Write **θ₁ = P** after planning; **θ₂ = (P, {Hₗ})** after retrieval; **θ₃ = (P, S)** after selection; **θ₄ = (P, {e_d})** after execution. Synthesis consumes **θ₄** plus **refs(S)**.  
+**Aggregation** stacks evidence in deterministic order—schematically **E = ⨁_{d ∈ S↓} e_d** with **S↓** the ordered selection—so every span of **A** stays attributable to some **d ∈ D**.
+
+---
+
+## What this repository implements
+
+In code, the five stages correspond to: **plan** → **search** (Weaviate hybrid index over **I**) → **select** → **execute** (General and/or Technical agents) → **synthesize**. Embeddings use **Azure OpenAI**; vectors live in **Weaviate** (self-hosted, bring-your-own vectors); agents are wired with **DSPy**.
+
+- **Plan** — **Q → P** (intent + subqueries).
+- **Search** — Each **qₗ → Hₗ** over indexed metadata.
+- **Select** — **(Q, P, {Hₗ}) → S** with per-dataset **RAG** vs **TECH** when Technical mode is enabled (General mode forces **RAG** for all selected **d**).
+- **Answer** — For each **d** in **S**: download resources, **e_d** via RAG path and/or technical path; then **P, {e_d}, refs → A** with attribution.
+
+### General vs Technical mode (UI)
+
+- **General** — Only the **RAG** path for every selected dataset: download → extract → chunk → embed → answer from context. No technical / RLM path.
+- **Technical** — The selector assigns **m_d ∈ {RAG, TECH}** per dataset; **TECH** uses structured parsing and an RLM-style loop (e.g. sandboxed REPL) when the question needs lookup or aggregation over tables/records.
 
 ---
 
@@ -28,30 +57,29 @@ The UI lets you choose **General** or **Technical** before submitting a question
 
 | Path | Description |
 |------|-------------|
-| **`src/`** | Application: backend (FastAPI), frontend, pipelines, agents, embeddings. See **`src/README.md`** for runbooks and API details. |
-| **`notebooks/`** | Research, prototyping, and experiments (embedding/retrieval, validation). |
+| **`src/`** | Application: backend (FastAPI), frontend, pipelines, agents, embeddings. See **`src/README.md`**. |
+| **`notebooks/`** | Research, prototyping, and experiments. |
 
-Design: prototype in `notebooks/`, then refactor into production modules in `src/`, keeping a clear split between experimentation and deployment.
+Prototype in `notebooks/`, ship stable pieces in `src/`.
 
 ---
 
 ## Quick links
 
-- **Run the app, ingest, search, streaming:** [**`src/README.md`**](src/README.md)
-- **Backend-only quickref:** [**`src/backend/README.md`**](src/backend/README.md)
+- **Run, ingest, search, streaming:** [**`src/README.md`**](src/README.md)
+- **Backend quickref:** [**`src/backend/README.md`**](src/backend/README.md)
 
 ---
 
 ## Core capabilities
 
-- Semantic + keyword search over French open data catalogue
-- **Mode choice (General vs Technical)** — Frontend toggle: General = RAG only; Technical = per-resource RAG or technical (selector-driven)
-- Multi-step agent pipeline (planner → search → selector → RAG/technical → synthesis)
-- **Technical agent** — Structure detection (tabular/records), parse to dataframe/records, RLM (DSPy) exploration in a sandboxed REPL; unsuitable resources get the same text extraction as the General agent
-- Streaming progress and final answer via SSE
-- RAG with chunking, embedding-based retrieval, and per-resource fairness
-- Source-attributed synthesis (dataset/source labels in the answer)
-- **LLM and embedding usage + cost estimates** — Per-agent token logs and pipeline grand total with optional pricing (e.g. gpt-5-mini, text-embedding-3-small)
+- Hybrid (vector + keyword) search over the French open-data catalogue (**I**)
+- **General vs Technical** UI modes (override to all-**RAG** vs selector-driven **RAG**/**TECH**)
+- Linear multi-agent pipeline consistent with the protocol above
+- Technical path: tabular/record parsing, RLM-style exploration in a sandbox; unstructured files fall back to text extraction
+- Streaming progress (SSE) and source-attributed **A**
+- RAG with chunking and embedding-based chunk retrieval where enabled
+- Per-stage LLM/embedding usage and optional cost estimates
 
 ---
 
