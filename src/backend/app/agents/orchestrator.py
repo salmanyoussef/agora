@@ -6,6 +6,7 @@ from app.services.dspy_setup import (
     estimate_and_log_pipeline_cost,
     format_embed_usage,
     format_lm_usage,
+    format_pipeline_cost_usd,
     get_embedding_cost_append,
     get_llm_cost_append,
     merge_embed_usage,
@@ -236,6 +237,7 @@ def _stream_run_impl(
         user_messages=user_messages,
         lm_usage_grand_total=grand_total_stream if grand_total_stream else None,
         embed_usage_grand_total=embed_grand_total_stream if embed_grand_total_stream.get("total_tokens") else None,
+        pipeline_cost_usd=format_pipeline_cost_usd(grand_total_stream, embed_grand_total_stream),
     )
     yield {"event": "done", "response": response.model_dump()}
 
@@ -451,4 +453,5 @@ class AgentOrchestrator:
             user_messages=user_messages,
             lm_usage_grand_total=grand_total if grand_total else None,
             embed_usage_grand_total=embed_grand_total if embed_grand_total.get("total_tokens") else None,
+            pipeline_cost_usd=format_pipeline_cost_usd(grand_total, embed_grand_total),
         )

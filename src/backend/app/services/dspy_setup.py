@@ -85,27 +85,22 @@ KNOWN_MODEL_PRICING: dict[str, dict[str, float]] = {
 
 
 def _is_priced_model(lm_key: str) -> bool:
-    """True if this LM key corresponds to our configured chat deployment and we have pricing."""
-    deployment = getattr(settings, "azure_openai_chat_deployment", "") or ""
-    if not deployment:
+    """True if this LM key corresponds to our configured chat model and we have pricing."""
+    model = settings.openai_chat_model
+    if not model:
         return False
-    # DSPy LM name is typically "azure/<deployment>"
-    if lm_key == deployment or lm_key == f"azure/{deployment}" or lm_key.endswith(f"/{deployment}"):
-        return deployment in KNOWN_MODEL_PRICING
+    if lm_key == model or lm_key == f"openai/{model}" or lm_key.endswith(f"/{model}"):
+        return model in KNOWN_MODEL_PRICING
     return False
 
 
-def get_llm_cost_append(grand_total_usage: dict[str, Any] | None) -> str:
-    """
-    If we have pricing for the configured chat model, return a string to append to the
-    LLM GRAND TOTAL log line (e.g. " | cost ~0.05 USD"). Otherwise return "".
-    """
+def estimate_llm_cost_usd(grand_total_usage: dict[str, Any] | None) -> float | None:
     if not grand_total_usage or not isinstance(grand_total_usage, dict):
-        return ""
-    deployment = getattr(settings, "azure_openai_chat_deployment", "") or ""
-    pricing = KNOWN_MODEL_PRICING.get(deployment) if deployment else None
+        return None
+    model = settings.openai_chat_model
+    pricing = KNOWN_MODEL_PRICING.get(model) if model else None
     if not pricing:
-        return ""
+        return None
     total_input = total_output = 0
     for lm_name, entry in grand_total_usage.items():
         if not _is_priced_model(lm_name) or not isinstance(entry, dict):
@@ -114,10 +109,20 @@ def get_llm_cost_append(grand_total_usage: dict[str, Any] | None) -> str:
         total_input += summed.get("prompt_tokens", 0) or summed.get("input_tokens", 0)
         total_output += summed.get("completion_tokens", 0) or summed.get("output_tokens", 0)
     if total_input == 0 and total_output == 0:
-        return ""
+        return None
     cost_input = (total_input / 1_000_000) * pricing["input_per_1M"]
     cost_output = (total_output / 1_000_000) * pricing["output_per_1M"]
-    cost_total = cost_input + cost_output
+    return cost_input + cost_output
+
+
+def get_llm_cost_append(grand_total_usage: dict[str, Any] | None) -> str:
+    """
+    If we have pricing for the configured chat model, return a string to append to the
+    LLM GRAND TOTAL log line (e.g. " | cost ~0.05 USD"). Otherwise return "".
+    """
+    cost_total = estimate_llm_cost_usd(grand_total_usage)
+    if cost_total is None:
+        return ""
     return f" | cost ~{cost_total:.6f} USD"
 
 
@@ -128,10 +133,10 @@ def estimate_and_log_pipeline_cost(grand_total_usage: dict[str, Any] | None) -> 
     """
     if not grand_total_usage or not isinstance(grand_total_usage, dict):
         return
-    deployment = getattr(settings, "azure_openai_chat_deployment", "") or ""
-    if KNOWN_MODEL_PRICING.get(deployment) is not None:
+    model = settings.openai_chat_model
+    if KNOWN_MODEL_PRICING.get(model) is not None:
         return  # Cost is on the grand total line
-    logger.info("LLM cost estimate: no pricing for deployment=%r (only gpt-5-mini has defined rates)", deployment)
+    logger.info("LLM cost estimate: no pricing for model=%r (known: %s)", model, list(KNOWN_MODEL_PRICING.keys()))
 
 
 # --- Embedding usage (pipeline only: search + General Agent chunk retrieval) ---
@@ -163,21 +168,41 @@ KNOWN_EMBED_PRICING: dict[str, float] = {
 }
 
 
+def estimate_embedding_cost_usd(grand_total_embed_usage: dict[str, int] | None) -> float | None:
+    if not grand_total_embed_usage or not grand_total_embed_usage.get("total_tokens"):
+        return None
+    model = settings.openai_embed_model
+    per_1M = KNOWN_EMBED_PRICING.get(model) if model else None
+    if per_1M is None:
+        return None
+    total_tokens = grand_total_embed_usage.get("total_tokens", 0)
+    return (total_tokens / 1_000_000) * per_1M
+
+
 def get_embedding_cost_append(grand_total_embed_usage: dict[str, int] | None) -> str:
     """
     If we have pipeline embedding usage and our embed deployment has known pricing,
     return a string to append to the embedding GRAND TOTAL log line (e.g. " | cost ~0.00 USD").
     Otherwise return "".
     """
-    if not grand_total_embed_usage or not grand_total_embed_usage.get("total_tokens"):
+    cost = estimate_embedding_cost_usd(grand_total_embed_usage)
+    if cost is None:
         return ""
-    deployment = getattr(settings, "azure_openai_embed_deployment", "") or ""
-    per_1M = KNOWN_EMBED_PRICING.get(deployment) if deployment else None
-    if per_1M is None:
-        return ""
-    total_tokens = grand_total_embed_usage.get("total_tokens", 0)
-    cost = (total_tokens / 1_000_000) * per_1M
     return f" | cost ~{cost:.6f} USD"
+
+
+def format_pipeline_cost_usd(
+    lm_usage: dict[str, Any] | None,
+    embed_usage: dict[str, int] | None,
+) -> str | None:
+    """Combined LLM + embedding cost as a decimal string (no rounding) for the API/UI."""
+    llm_cost = estimate_llm_cost_usd(lm_usage)
+    embed_cost = estimate_embedding_cost_usd(embed_usage)
+    if llm_cost is None and embed_cost is None:
+        return None
+    total = (llm_cost or 0.0) + (embed_cost or 0.0)
+    text = f"{total:.12f}".rstrip("0").rstrip(".")
+    return text or "0"
 
 
 def estimate_and_log_embedding_cost(grand_total_embed_usage: dict[str, int] | None) -> None:
@@ -187,12 +212,12 @@ def estimate_and_log_embedding_cost(grand_total_embed_usage: dict[str, int] | No
     """
     if not grand_total_embed_usage or not grand_total_embed_usage.get("total_tokens"):
         return
-    deployment = getattr(settings, "azure_openai_embed_deployment", "") or ""
-    if KNOWN_EMBED_PRICING.get(deployment) is not None:
+    model = settings.openai_embed_model
+    if KNOWN_EMBED_PRICING.get(model) is not None:
         return  # Cost is on the grand total line
     logger.info(
-        "Embedding cost estimate: no pricing for deployment=%r (known: %s)",
-        deployment,
+        "Embedding cost estimate: no pricing for model=%r (known: %s)",
+        model,
         list(KNOWN_EMBED_PRICING.keys()),
     )
 
@@ -209,18 +234,16 @@ def configure_dspy() -> None:
         return
 
     logger.info(
-        "Configuring DSPy with Azure OpenAI chat deployment=%s",
-        settings.azure_openai_chat_deployment,
+        "Configuring DSPy with OpenAI chat model=%s",
+        settings.openai_chat_model,
     )
 
     lm = dspy.LM(
-        f"azure/{settings.azure_openai_chat_deployment}",
-        api_key=settings.azure_openai_api_key,
-        api_base=settings.azure_openai_endpoint,
-        api_version=settings.azure_openai_chat_api_version,
+        f"openai/{settings.openai_chat_model}",
+        api_key=settings.openai_api_key,
         model_type="chat",
         temperature=None,
-        max_tokens=64000,
+        max_tokens=settings.openai_chat_max_tokens,
     )
     _LM = lm
 

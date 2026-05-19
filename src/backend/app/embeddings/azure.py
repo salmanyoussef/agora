@@ -1,19 +1,23 @@
+"""
+OpenAI embedding client (legacy module path: app.embeddings.azure).
+
+Uses OPENAI_API_KEY and OPENAI_EMBED_MODEL from settings.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 import logging
 
-from openai import AzureOpenAI
-
+from openai import OpenAI
 
 logger = logging.getLogger(__name__)
 
-_shared_client: Optional["AzureEmbeddingClient"] = None
+_shared_client: Optional["OpenAIEmbeddingClient"] = None
 
 
 def _usage_to_dict(usage: Any) -> Optional[Dict[str, int]]:
-    """Extract prompt_tokens and total_tokens from Azure usage for pipeline cost tracking."""
     if not usage:
         return None
     prompt_tokens = getattr(usage, "prompt_tokens", None)
@@ -31,63 +35,56 @@ def _usage_to_dict(usage: Any) -> Optional[Dict[str, int]]:
 
 
 @dataclass
-class AzureEmbeddingClient:
-    azure_endpoint: str
+class OpenAIEmbeddingClient:
     api_key: str
-    deployment: str
-    api_version: str
+    model: str
 
     def __post_init__(self) -> None:
-        self.client = AzureOpenAI(
-            azure_endpoint=self.azure_endpoint,
-            api_key=self.api_key,
-            api_version=self.api_version,
-        )
+        self.client = OpenAI(api_key=self.api_key)
 
     def _log_usage(self, resp: Any, batch_size: int) -> None:
         usage: Optional[Any] = getattr(resp, "usage", None)
         if not usage:
-            logger.info("Azure embeddings batch completed: texts=%d", batch_size)
+            logger.info("OpenAI embeddings batch completed: texts=%d model=%s", batch_size, self.model)
             return
         d = _usage_to_dict(usage)
         if d:
             logger.info(
-                "Azure embeddings batch completed: texts=%d, prompt_tokens=%s, total_tokens=%s",
+                "OpenAI embeddings batch completed: texts=%d model=%s prompt_tokens=%s total_tokens=%s",
                 batch_size,
+                self.model,
                 d.get("prompt_tokens"),
                 d.get("total_tokens"),
             )
         else:
-            logger.info("Azure embeddings batch completed: texts=%d", batch_size)
+            logger.info("OpenAI embeddings batch completed: texts=%d model=%s", batch_size, self.model)
 
     def embed_texts(self, texts: List[str]) -> Tuple[List[List[float]], Optional[Dict[str, int]]]:
-        """
-        Return (embeddings, usage_dict). usage_dict has prompt_tokens, total_tokens for pipeline cost tracking.
-        """
-        logger.info("Calling Azure embeddings: texts=%d", len(texts))
-        resp = self.client.embeddings.create(model=self.deployment, input=texts)
+        logger.info("Calling OpenAI embeddings: texts=%d model=%s", len(texts), self.model)
+        resp = self.client.embeddings.create(model=self.model, input=texts)
         self._log_usage(resp, batch_size=len(texts))
         embeddings = [d.embedding for d in resp.data]
         usage_dict = _usage_to_dict(getattr(resp, "usage", None))
         return (embeddings, usage_dict)
 
     def close(self) -> None:
-        """Close the underlying OpenAI client and release connections."""
         if hasattr(self.client, "close"):
             self.client.close()
-            logger.debug("Azure embedding client closed")
+            logger.debug("OpenAI embedding client closed")
 
 
-def get_embedding_client() -> "AzureEmbeddingClient":
-    """Return a shared Azure embedding client (lazy singleton). Reuse avoids leaking SSL connections."""
+# Backward-compatible alias for type hints / imports
+AzureEmbeddingClient = OpenAIEmbeddingClient
+
+
+def get_embedding_client() -> OpenAIEmbeddingClient:
     global _shared_client
     if _shared_client is not None:
         return _shared_client
     from app.settings import settings
-    _shared_client = AzureEmbeddingClient(
-        azure_endpoint=settings.azure_openai_endpoint,
-        api_key=settings.azure_openai_api_key,
-        deployment=settings.azure_openai_embed_deployment,
-        api_version=settings.azure_openai_embed_api_version,
+
+    _shared_client = OpenAIEmbeddingClient(
+        api_key=settings.openai_api_key,
+        model=settings.openai_embed_model,
     )
     return _shared_client

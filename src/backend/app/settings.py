@@ -6,13 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file="../.env", env_file_encoding="utf-8", extra="ignore")
 
-    # Azure OpenAI
-    azure_openai_endpoint: str
-    azure_openai_api_key: str
-    azure_openai_embed_api_version: str = "2024-02-01"  # from env AZURE_OPENAI_EMBED_API_VERSION
-    azure_openai_embed_deployment: str = "text-embedding-3-small"
-    azure_openai_chat_deployment: str = "gpt-5-mini"
-    azure_openai_chat_api_version: str = "2024-12-01-preview"  # from env AZURE_OPENAI_CHAT_API_VERSION
+    # OpenAI (platform API)
+    openai_api_key: str
+    openai_chat_model: str = "gpt-5-mini"
+    openai_chat_max_tokens: int = 64000
+    openai_embed_model: str = "text-embedding-3-small"
 
     # Weaviate
     weaviate_url: str = "http://localhost:8080"
@@ -20,6 +18,9 @@ class Settings(BaseSettings):
     weaviate_grpc_port: int = 50051
     weaviate_api_key: str | None = None
     datasets_collection: str = "Dataset"
+
+    # Demo: faster technical agent (RLM with lower limits, 1 resource/dataset, cap datasets)
+    agora_demo_mode: bool = False
 
 
 settings = Settings()
