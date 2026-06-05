@@ -93,6 +93,6 @@ For full details, please refer to the [LICENSE](./LICENSE) file.
 
 ## Acknowledgments & Credits
 
-The **AGORA** (Agent-based Government Open-data Reasoning Assistant) framework was originally conceived by **Dr. Nasreddine Cheniki** (LIFAT, Infeurope.lu) and **Dr. Yacine Sam** (LIFAT, University of Tours) during an international exchange research program in France[cite: 1]. 
+The **AGORA** (Agent-based Government Open-data Reasoning Assistant) framework was originally conceived by **Dr. Nasreddine Cheniki** (LIFAT, Infeurope.lu) and **Dr. Yacine Sam** (LIFAT, University of Tours) during an international exchange research program in France. 
 
 The core system framework, modular pipeline logic, and multi-agent execution architecture were designed and implemented by Salman Youssef. Special thanks to Dr. Nasreddine Cheniki for the foundational engineering guidance to leverage Recursive Language Models (RLMs) for advanced data analysis and for utilizing the DSPy compilation framework.
