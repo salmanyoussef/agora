@@ -85,4 +85,14 @@ Prototype in `notebooks/`, ship stable pieces in `src/`.
 
 ## License
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+AGORA is licensed under the **Apache License, Version 2.0**. 
+
+This is a permissive license that allows for free community, academic, and commercial use. However, it provides explicit protections regarding contributor patent grants, patent retaliation defenses, and strict restrictions against using the AGORA project name or trademarks without explicit permission.
+
+For full details, please refer to the [LICENSE](./LICENSE) file.
+
+## Acknowledgments & Credits
+
+The **AGORA** (Agent-based Government Open-data Reasoning Assistant) framework was originally conceived by **Dr. Nasreddine Cheniki** (LIFAT, Infeurope.lu) and **Dr. Yacine Sam** (LIFAT, University of Tours) during an international exchange research program in France[cite: 1]. 
+
+The core system framework, modular pipeline logic, and multi-agent execution architecture were designed and implemented by Salman Youssef. Special thanks to Dr. Nasreddine Cheniki for the foundational engineering guidance to leverage Recursive Language Models (RLMs) for advanced data analysis and for utilizing the DSPy compilation framework.
