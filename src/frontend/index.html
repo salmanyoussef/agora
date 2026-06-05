@@ -432,6 +432,43 @@
       color: var(--text);
       font-weight: 600;
     }
+    .data-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+      padding: 0.75rem 1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+    }
+    .data-bar-count strong {
+      color: var(--text);
+      font-weight: 600;
+    }
+    .btn-sync {
+      padding: 0.5rem 1rem;
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-sync:hover:not(:disabled) {
+      background: var(--accent-subtle);
+    }
+    .btn-sync:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -441,6 +478,11 @@
       <p class="tagline">ask questions over French open government data. <b>agora</b> will plan, search, select datasets, then synthesize a data-driven answer.</p>
       <p id="mode-prompt" class="mode-prompt">Please select mode: general or technical to get started.</p>
     </header>
+
+    <div class="data-bar">
+      <span id="weaviate-count" class="data-bar-count">Loading index…</span>
+      <button type="button" id="sync-data" class="btn-sync">Sync from data.gouv.fr</button>
+    </div>
 
     <div id="mode-toggle-wrap" class="mode-toggle-wrap mode-toggle--none-selected">
       <button type="button" id="mode-general" class="btn-mode btn-mode-general" aria-pressed="false">General</button>
@@ -476,6 +518,8 @@
     const questionEl = document.getElementById("question");
     const submitBtn = document.getElementById("submit");
     const stopBtn = document.getElementById("stop");
+    const syncBtn = document.getElementById("sync-data");
+    const weaviateCountEl = document.getElementById("weaviate-count");
     const btnSlot = document.getElementById("btn-slot");
     const modeGeneralBtn = document.getElementById("mode-general");
     const modeTechnicalBtn = document.getElementById("mode-technical");
@@ -700,9 +744,111 @@
     }
 
     let abortController = null;
+    let syncAbortController = null;
+    let isSyncing = false;
+
+    function setWeaviateCount(count) {
+      if (!weaviateCountEl) return;
+      const n = Number(count);
+      if (Number.isNaN(n)) {
+        weaviateCountEl.textContent = "Index count unavailable";
+        return;
+      }
+      weaviateCountEl.innerHTML = "<strong>" + n.toLocaleString("en-US") + "</strong> datasets indexed in Weaviate";
+    }
+
+    async function refreshWeaviateCount() {
+      const base = getBaseUrl();
+      try {
+        const res = await fetch(base + "/debug/count");
+        if (!res.ok) throw new Error(res.status + " " + res.statusText);
+        const data = await res.json();
+        setWeaviateCount(data.count);
+      } catch (err) {
+        if (weaviateCountEl) weaviateCountEl.textContent = "Could not load index count";
+        console.warn("refreshWeaviateCount", err);
+      }
+    }
+
+    refreshWeaviateCount();
 
     stopBtn.addEventListener("click", () => {
       if (abortController) abortController.abort();
+      if (syncAbortController) syncAbortController.abort();
+    });
+
+    syncBtn.addEventListener("click", async () => {
+      if (isSyncing) return;
+      const confirmed = window.confirm(
+        "Sync the full data.gouv.fr catalogue into Weaviate?\n\n"
+        + "This updates existing datasets, adds new ones, and removes datasets no longer on data.gouv.fr. "
+        + "It may take several minutes and uses embedding API credits."
+      );
+      if (!confirmed) return;
+
+      isSyncing = true;
+      syncBtn.disabled = true;
+      submitBtn.disabled = true;
+      syncAbortController = new AbortController();
+
+      streamLog.innerHTML = "";
+      clearEvidenceLog();
+      setAnswer("");
+      setPipelineCost(null);
+      resultHeading.textContent = "Data sync";
+      resultContent.classList.remove("show-answer");
+      resultContent.classList.add("show-progress");
+      resultCard.classList.add("active");
+      appendStreamMessage("Connecting to sync…", "status");
+
+      const base = getBaseUrl();
+      try {
+        const res = await fetch(base + "/ingest/sync/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ page_size: 100, prune_stale: true }),
+          signal: syncAbortController.signal,
+        });
+        if (!res.ok) throw new Error(res.status + " " + res.statusText);
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const parts = buffer.split("\n\n");
+          buffer = parts.pop() || "";
+          for (const part of parts) {
+            if (!part.startsWith("data: ")) continue;
+            try {
+              const data = JSON.parse(part.slice(6));
+              if (data.event === "status" && data.message) appendStreamMessage(data.message, "status");
+              else if (data.event === "progress" && data.message) appendStreamMessage(data.message, "status");
+              else if (data.event === "error" && data.message) appendStreamMessage("Error: " + data.message, "error");
+              else if (data.event === "done") {
+                if (data.message) appendStreamMessage(data.message, "status");
+                if (data.weaviate_count != null) setWeaviateCount(data.weaviate_count);
+                resultHeading.textContent = "Sync complete";
+              }
+            } catch (e) { console.warn("Parse sync SSE chunk", e); }
+          }
+        }
+        await refreshWeaviateCount();
+      } catch (err) {
+        if (err.name === "AbortError") {
+          appendStreamMessage("Sync cancelled.", "status");
+        } else {
+          appendStreamMessage("Error: " + err.message, "error");
+          appendStreamMessage("Ensure the backend is running and reachable at " + base + ".", "error");
+        }
+      } finally {
+        isSyncing = false;
+        syncBtn.disabled = false;
+        submitBtn.disabled = !selectedMode;
+        syncAbortController = null;
+        resultCard.classList.remove("active");
+      }
     });
 
     submitBtn.addEventListener("click", async () => {

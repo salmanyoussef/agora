@@ -1,18 +1,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Tuple
+from typing import Any, Dict, Iterable, List, Set, Tuple
 from urllib.parse import urlparse
 import logging
+import uuid
 
 import weaviate
 import weaviate.classes as wvc
 from weaviate.classes.init import Auth
+from weaviate.classes.query import Filter
+from weaviate.exceptions import UnexpectedStatusCodeError
 
 from app.settings import settings
 
 
 logger = logging.getLogger(__name__)
+
+# Stable namespace for deterministic UUIDs when no existing object is found.
+_DATASET_UUID_NS = uuid.UUID("f47ac10b-58cc-4372-a567-0e02b2c3d479")
+
+
+def _dataset_uuid(dataset_id: str) -> uuid.UUID:
+    return uuid.uuid5(_DATASET_UUID_NS, dataset_id.strip())
 
 
 @dataclass
@@ -84,33 +94,82 @@ class WeaviateStore:
         finally:
             client.close()
 
+    def _existing_uuids_by_dataset_id(
+        self,
+        col: Any,
+        dataset_ids: List[str],
+    ) -> Dict[str, uuid.UUID]:
+        if not dataset_ids:
+            return {}
+        resp = col.query.fetch_objects(
+            filters=Filter.by_property("dataset_id").contains_any(dataset_ids),
+            limit=len(dataset_ids),
+        )
+        out: Dict[str, uuid.UUID] = {}
+        for obj in resp.objects or []:
+            props = obj.properties or {}
+            did = props.get("dataset_id")
+            if isinstance(did, str) and did and did not in out:
+                out[did] = obj.uuid
+        return out
+
     def upsert_many(self, rows: Iterable[Tuple[Dict[str, Any], List[float]]]) -> int:
+        """Insert or update objects keyed by dataset_id (one Weaviate object per catalogue id)."""
         self.ensure_collection()
         client = self.connect()
         try:
             col = client.collections.use(self.collection_name)
-
-            objs: List[wvc.data.DataObject] = []
-            for props, vec in rows:
-                objs.append(wvc.data.DataObject(properties=props, vector=vec))
-
-            if not objs:
+            row_list = list(rows)
+            if not row_list:
                 logger.info("Weaviate upsert_many called with empty batch")
                 return 0
 
-            logger.info("Weaviate upsert_many: inserting batch_size=%d", len(objs))
-            res = col.data.insert_many(objs)
+            dataset_ids = [props.get("dataset_id", "") for props, _ in row_list if props.get("dataset_id")]
+            existing = self._existing_uuids_by_dataset_id(col, dataset_ids)
 
-            if hasattr(res, "has_errors") and res.has_errors:
-                logger.warning("Weaviate insert_many reported errors")
+            upserted = 0
+            logger.info("Weaviate upsert_many: batch_size=%d", len(row_list))
+            for props, vec in row_list:
+                did = props.get("dataset_id")
+                if not did:
+                    continue
+                did_str = str(did)
+                if did_str in existing:
+                    col.data.replace(
+                        uuid=existing[did_str],
+                        properties=props,
+                        vector=vec,
+                    )
+                else:
+                    obj_uuid = _dataset_uuid(did_str)
+                    try:
+                        col.data.insert(uuid=obj_uuid, properties=props, vector=vec)
+                    except UnexpectedStatusCodeError:
+                        # Object may already exist under the deterministic id (e.g. retry).
+                        col.data.replace(uuid=obj_uuid, properties=props, vector=vec)
+                upserted += 1
 
-            if hasattr(res, "uuids") and res.uuids is not None:
-                inserted = len(res.uuids)
-                logger.info("Weaviate insert_many succeeded: inserted=%d", inserted)
-                return inserted
+            logger.info("Weaviate upsert_many succeeded: upserted=%d", upserted)
+            return upserted
+        finally:
+            client.close()
 
-            logger.info("Weaviate insert_many completed without uuids; assuming inserted=%d", len(objs))
-            return len(objs)
+    def delete_stale_except(self, keep_dataset_ids: Set[str]) -> int:
+        """Remove indexed datasets whose id is no longer on data.gouv.fr."""
+        self.ensure_collection()
+        client = self.connect()
+        removed = 0
+        try:
+            col = client.collections.use(self.collection_name)
+            logger.info("Weaviate delete_stale_except: scanning collection=%s", self.collection_name)
+            for obj in col.iterator():
+                props = obj.properties or {}
+                did = props.get("dataset_id")
+                if isinstance(did, str) and did and did not in keep_dataset_ids:
+                    col.data.delete_by_id(obj.uuid)
+                    removed += 1
+            logger.info("Weaviate delete_stale_except: removed=%d", removed)
+            return removed
         finally:
             client.close()
 

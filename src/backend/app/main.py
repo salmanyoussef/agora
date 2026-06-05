@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from app.agents.orchestrator import AgentOrchestrator, _stream_run
-from app.pipelines.retrieval import ingest_data_gouv
+from app.pipelines.retrieval import ingest_data_gouv, iter_sync_data_gouv
 from app.weaviate.store import WeaviateStore
 
 _log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -60,6 +60,14 @@ class IngestRequest(BaseModel):
     hard_limit: int | None = None
 
 
+class SyncRequest(BaseModel):
+    page_size: int = Field(default=100, ge=10, le=200)
+    prune_stale: bool = Field(
+        default=True,
+        description="Remove Weaviate datasets that no longer exist on data.gouv.fr.",
+    )
+
+
 @app.get("/health")
 def health():
     return {"ok": True}
@@ -84,6 +92,38 @@ def ingest(req: IngestRequest):
     )
     logger.info("HTTP /ingest completed: ingested=%d", n)
     return {"ingested": n}
+
+
+def _sse_ingest_sync(page_size: int, prune_stale: bool):
+    stream = iter_sync_data_gouv(page_size=page_size, prune_stale=prune_stale)
+    try:
+        for payload in stream:
+            yield f"data: {json.dumps(payload)}\n\n"
+    except GeneratorExit:
+        stream.close() if hasattr(stream, "close") else None
+        raise
+    except Exception as e:
+        logger.exception("Ingest sync stream failed")
+        yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+
+
+@app.post("/ingest/sync/stream")
+def ingest_sync_stream(req: SyncRequest):
+    """Stream a full data.gouv.fr → Weaviate sync via Server-Sent Events."""
+    logger.info(
+        "HTTP /ingest/sync/stream called: page_size=%d, prune_stale=%s",
+        req.page_size,
+        req.prune_stale,
+    )
+    return StreamingResponse(
+        _sse_ingest_sync(req.page_size, req.prune_stale),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @app.post("/search")
