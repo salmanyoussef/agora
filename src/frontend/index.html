@@ -254,6 +254,94 @@
     .result-content { min-height: 3rem; }
     .result-content.show-progress .answer-body-wrap { display: none; }
     .result-content.show-answer .stream-log { display: none; }
+    .evidence-section-label {
+      display: none;
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-tertiary);
+      margin: 0.75rem 0 0.5rem 0;
+    }
+    .evidence-section-label.visible { display: block; }
+    .evidence-log { margin-bottom: 0.5rem; }
+    .evidence-card {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 0.65rem;
+      background: var(--surface, #fafafa);
+      overflow: hidden;
+      animation: fadeIn 0.3s ease;
+    }
+    .evidence-card-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.35rem 0.5rem;
+      padding: 0.5rem 0.65rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.8125rem;
+    }
+    .evidence-card-title {
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+      min-width: 8rem;
+    }
+    .evidence-mode-badge {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 0.12rem 0.4rem;
+      border-radius: 4px;
+    }
+    .evidence-mode-badge.rag {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    .evidence-mode-badge.technical {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+    .evidence-card-meta {
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      width: 100%;
+    }
+    .evidence-card-body {
+      padding: 0.55rem 0.65rem;
+      font-size: 0.8125rem;
+      line-height: 1.45;
+      color: var(--text-secondary);
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 14rem;
+      overflow-y: auto;
+    }
+    .evidence-card.expanded .evidence-card-body {
+      max-height: none;
+    }
+    .evidence-card-toggle {
+      display: block;
+      width: 100%;
+      padding: 0.35rem;
+      font-size: 0.75rem;
+      color: var(--text-tertiary);
+      background: transparent;
+      border: none;
+      border-top: 1px solid var(--border);
+      cursor: pointer;
+      text-align: center;
+    }
+    .evidence-card-toggle:hover {
+      color: var(--text);
+      background: rgba(0, 0, 0, 0.03);
+    }
+    .evidence-card-body a {
+      color: var(--accent);
+      word-break: break-all;
+    }
     .stream-log {
       min-height: 3rem;
       padding-right: 0.25rem;
@@ -291,6 +379,8 @@
     .stream-item .text-wrap { flex: 1; min-width: 0; }
     .stream-item .text { color: var(--text-secondary); }
     .stream-item.user_message .text { color: var(--text); font-weight: 500; }
+    .stream-item.technical_repl .text,
+    .stream-item.row_count .text { color: #0a58ca; font-weight: 500; }
     .stream-item.error .text { color: var(--error); }
     .stream-item.expandable { cursor: pointer; }
     .stream-item.expandable .text-wrap { cursor: pointer; }
@@ -372,6 +462,8 @@
       <h2 id="result-heading">Progress</h2>
       <div id="result-content" class="result-content show-progress">
         <div id="stream-log" class="stream-log"></div>
+        <p id="evidence-section-label" class="evidence-section-label">Findings per dataset (input to synthesis)</p>
+        <div id="evidence-log" class="evidence-log" aria-live="polite"></div>
         <div class="answer-body-wrap">
           <div id="answer" class="answer-body"></div>
           <div id="pipeline-cost" class="pipeline-cost"></div>
@@ -417,9 +509,12 @@
     const resultHeading = document.getElementById("result-heading");
     const resultContent = document.getElementById("result-content");
     const streamLog = document.getElementById("stream-log");
+    const evidenceLog = document.getElementById("evidence-log");
+    const evidenceSectionLabel = document.getElementById("evidence-section-label");
     const answerEl = document.getElementById("answer");
 
     const MAX_VISIBLE_MESSAGES = 4;
+    const EVIDENCE_COLLAPSE_CHARS = 600;
     const TRUNCATE_LEN = 72;
 
     function getBaseUrl() {
@@ -467,10 +562,108 @@
       });
     }
 
+    function formatRowCount(n) {
+      if (n == null || n === "") return null;
+      const num = Number(n);
+      if (Number.isNaN(num)) return null;
+      return num.toLocaleString("en-US");
+    }
+
+    function clearEvidenceLog() {
+      if (evidenceLog) evidenceLog.innerHTML = "";
+      if (evidenceSectionLabel) evidenceSectionLabel.classList.remove("visible");
+    }
+
+    function appendEvidenceCard(data) {
+      if (!evidenceLog || !data.evidence) return;
+      if (evidenceSectionLabel) evidenceSectionLabel.classList.add("visible");
+
+      const mode = (data.mode === "technical") ? "technical" : "rag";
+      const modeLabel = mode === "technical" ? "Technical" : "RAG";
+      const title = escapeHtml(data.dataset_title || "Dataset");
+      const org = data.dataset_organization ? escapeHtml(data.dataset_organization) : "";
+      const url = data.dataset_url || "";
+      const evidenceText = data.evidence || "";
+
+      let metaParts = [];
+      if (data.resource_title) metaParts.push("Resource: " + escapeHtml(data.resource_title));
+      const replFmt = formatRowCount(data.repl_rows);
+      const totalFmt = formatRowCount(data.resource_total_rows);
+      if (replFmt != null) {
+        let rowMeta = replFmt + " rows in REPL";
+        if (totalFmt != null) rowMeta += " (~" + totalFmt + " rows in file)";
+        metaParts.push(rowMeta);
+      }
+      if (org) metaParts.push(org);
+
+      const card = document.createElement("article");
+      card.className = "evidence-card";
+      card.setAttribute("role", "article");
+
+      const header = document.createElement("div");
+      header.className = "evidence-card-header";
+      let titleHtml = "<span class=\"evidence-card-title\">" + title + "</span>";
+      if (url) {
+        const safeHref = url.replace(/&/g, "&amp;").replace(/"/g, "&quot;");
+        titleHtml = "<span class=\"evidence-card-title\"><a href=\"" + safeHref + "\" target=\"_blank\" rel=\"noopener noreferrer\">" + title + "</a></span>";
+      }
+      header.innerHTML = titleHtml
+        + "<span class=\"evidence-mode-badge " + mode + "\">" + modeLabel + "</span>"
+        + (metaParts.length ? "<span class=\"evidence-card-meta\">" + metaParts.join(" · ") + "</span>" : "");
+
+      const body = document.createElement("div");
+      body.className = "evidence-card-body";
+      body.innerHTML = linkifyAnswer(evidenceText);
+
+      card.appendChild(header);
+      card.appendChild(body);
+
+      if (evidenceText.length > EVIDENCE_COLLAPSE_CHARS) {
+        const toggle = document.createElement("button");
+        toggle.type = "button";
+        toggle.className = "evidence-card-toggle";
+        toggle.textContent = "Show full findings";
+        toggle.addEventListener("click", () => {
+          const expanded = card.classList.toggle("expanded");
+          toggle.textContent = expanded ? "Show less" : "Show full findings";
+        });
+        card.appendChild(toggle);
+      }
+
+      evidenceLog.appendChild(card);
+      card.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
+    function appendTechnicalReplMessage(data) {
+      const replFmt = formatRowCount(data.repl_rows);
+      const totalFmt = formatRowCount(data.resource_total_rows);
+      const maxFmt = formatRowCount(data.max_repl_rows != null ? data.max_repl_rows : 50000);
+      let line = data.message || "";
+      if (!line && replFmt != null) {
+        line = "Technical REPL: exploring " + replFmt + " rows";
+        if (totalFmt != null) {
+          line += " (~" + totalFmt + " in resource";
+          if (data.truncated) line += ", truncated to cap";
+          line += ")";
+        } else if (data.truncated && maxFmt) {
+          line += " (at " + maxFmt + " row cap)";
+        }
+        line += ".";
+      }
+      if (line) appendStreamMessage(line, "technical_repl");
+    }
+
+    function appendRowCountProgress(message) {
+      if (message) appendStreamMessage(message, "row_count");
+    }
+
     function appendStreamMessage(fullText, kind) {
-      while (streamLog.children.length >= MAX_VISIBLE_MESSAGES)
-        streamLog.removeChild(streamLog.firstChild);
-      const truncate = fullText.length > TRUNCATE_LEN;
+      const isRowStats = kind === "technical_repl" || kind === "row_count";
+      if (!isRowStats) {
+        while (streamLog.children.length >= MAX_VISIBLE_MESSAGES)
+          streamLog.removeChild(streamLog.firstChild);
+      }
+      const truncate = !isRowStats && fullText.length > TRUNCATE_LEN;
       const displayText = truncate ? fullText.slice(0, TRUNCATE_LEN).trim() + "…" : fullText;
       const item = document.createElement("div");
       item.className = "stream-item " + (kind || "status") + (truncate ? " expandable" : "");
@@ -519,8 +712,10 @@
       const use_only_general_agent = selectedMode === "general";
 
       streamLog.innerHTML = "";
+      clearEvidenceLog();
       setAnswer("");
       setPipelineCost(null);
+      let evidenceCardCount = 0;
       submitBtn.disabled = true;
       btnSlot.classList.add("btn-slot--loading");
       abortController = new AbortController();
@@ -554,13 +749,38 @@
               const data = JSON.parse(part.slice(6));
               if (data.event === "status" && data.message) appendStreamMessage(data.message, "status");
               else if (data.event === "plan" && data.plan) { /* no progress line for plan */ }
-              else if (data.event === "user_message" && data.message) appendStreamMessage(data.message, "user_message");
+              else if (data.event === "user_message" && data.message) {
+                if (/^Parsed «/.test(data.message) || /^Technical REPL ·/.test(data.message)) {
+                  appendRowCountProgress(data.message);
+                } else {
+                  appendStreamMessage(data.message, "user_message");
+                }
+              }
+              else if (data.event === "technical_repl") appendTechnicalReplMessage(data);
+              else if (data.event === "evidence") {
+                appendEvidenceCard(data);
+                evidenceCardCount += 1;
+              }
               else if (data.event === "error" && data.message) {
                 appendStreamMessage("Error: " + data.message, "error");
                 appendStreamMessage("Check the backend terminal for details.", "error");
               }
               else if (data.event === "done" && data.response) {
                 const r = data.response;
+                const blocks = r.evidence || [];
+                for (let i = evidenceCardCount; i < blocks.length; i++) {
+                  const block = blocks[i];
+                  appendEvidenceCard({
+                    event: "evidence",
+                    mode: block.mode,
+                    subquery: block.subquery,
+                    dataset_title: "Dataset " + (i + 1),
+                    evidence: block.evidence,
+                    repl_rows: block.repl_rows,
+                    resource_total_rows: block.resource_total_rows,
+                    resource_title: block.resource_title,
+                  });
+                }
                 setAnswer(r.answer || "");
                 setPipelineCost(r.pipeline_cost_usd);
                 resultHeading.textContent = "Answer";

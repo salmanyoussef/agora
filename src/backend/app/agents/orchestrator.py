@@ -23,6 +23,8 @@ from app.pipelines.retrieval import search_datasets
 from app.models.agent_response import AgentResponse
 from app.models.dataset_selection import SelectedDataset
 from app.models.execution_result import ExecutionResult
+from app.services.evidence_sse import build_evidence_sse_payload
+from app.services.technical_feedback import build_technical_repl_sse_payload
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,18 @@ USE_ONLY_GENERAL_AGENT = False
 
 # Public dataset page on data.gouv.fr (used when hit has no url)
 DATA_GOUV_DATASET_PAGE_BASE = "https://www.data.gouv.fr/fr/datasets"
+
+
+def _emit_evidence_sse(
+    result: ExecutionResult,
+    ref: dict,
+) -> dict:
+    return build_evidence_sse_payload(
+        result,
+        dataset_title=ref.get("title") or "Dataset",
+        dataset_url=ref.get("url") or "",
+        dataset_organization=ref.get("organization") or "",
+    )
 
 
 def _dataset_ref_from_hit(hit: dict) -> dict:
@@ -151,10 +165,24 @@ def _stream_run_impl(
                                 sub.question, [hit], dataset_reasoning=sel.reasoning or ""
                             )
                         else:
-                            result = orchestrator.technical_agent.run(
-                                sub.question, [hit], dataset_reasoning=sel.reasoning or ""
-                            )
+                            result = None
+                            for event in orchestrator.technical_agent.iter_run(
+                                sub.question,
+                                [hit],
+                                dataset_reasoning=sel.reasoning or "",
+                                user_question=question,
+                            ):
+                                if isinstance(event, str):
+                                    user_messages.append(event)
+                                    yield {"event": "user_message", "message": event}
+                                else:
+                                    result = event
+                            repl_payload = build_technical_repl_sse_payload(result, title)
+                            if repl_payload:
+                                user_messages.append(repl_payload["message"])
+                                yield repl_payload
                         evidence_blocks.append(result)
+                        yield _emit_evidence_sse(result, ref)
                         if getattr(result, "lm_usage", None):
                             usage_records_stream.append(result.lm_usage)
                         if getattr(result, "embed_usage", None):
@@ -166,15 +194,15 @@ def _stream_run_impl(
                             run_err,
                             exc_info=True,
                         )
-                        evidence_blocks.append(
-                            ExecutionResult(
-                                mode="rag",
-                                subquery=sub.question,
-                                evidence=f"[Skipped: error processing this dataset — {run_err!s}]",
-                                lm_usage=None,
-                                embed_usage=None,
-                            )
+                        skip_result = ExecutionResult(
+                            mode="rag",
+                            subquery=sub.question,
+                            evidence=f"[Skipped: error processing this dataset — {run_err!s}]",
+                            lm_usage=None,
+                            embed_usage=None,
                         )
+                        evidence_blocks.append(skip_result)
+                        yield _emit_evidence_sse(skip_result, ref)
                         yield {"event": "user_message", "message": f"Skipped «{title}» due to error."}
 
         except Exception as e:
@@ -198,6 +226,7 @@ def _stream_run_impl(
                     sub.question, [hit], dataset_reasoning=""
                 )
                 evidence_blocks.append(result)
+                yield _emit_evidence_sse(result, ref)
                 if getattr(result, "lm_usage", None):
                     usage_records_stream.append(result.lm_usage)
                 if getattr(result, "embed_usage", None):
@@ -370,11 +399,25 @@ class AgentOrchestrator:
                                 dataset_reasoning=sel.reasoning or "",
                             )
                         else:
+                            result = None
+                            progress_msgs: list[str] = []
+
+                            def _on_progress(msg: str) -> None:
+                                progress_msgs.append(msg)
+                                user_messages.append(msg)
+                                logger.info("User message: %s", msg)
+
                             result = self.technical_agent.run(
                                 sub.question,
                                 [hit],
                                 dataset_reasoning=sel.reasoning or "",
+                                user_question=question,
+                                on_progress=_on_progress,
                             )
+                            repl_payload = build_technical_repl_sse_payload(result, title)
+                            if repl_payload:
+                                user_messages.append(repl_payload["message"])
+                                logger.info("User message: %s", repl_payload["message"])
                         evidence_blocks.append(result)
                         if getattr(result, "lm_usage", None):
                             usage_records.append(result.lm_usage)

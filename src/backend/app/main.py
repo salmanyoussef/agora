@@ -121,7 +121,7 @@ def _sse_stream(question: str, k: int, use_only_general_agent: bool | None = Non
 def search_stream(req: SearchRequest):
     """Stream search progress in real time via Server-Sent Events (SSE).
     Connect with EventSource or fetch with stream; each event is JSON:
-    - event: 'status' | 'plan' | 'user_message' | 'done'
+    - event: 'status' | 'plan' | 'user_message' | 'technical_repl' | 'evidence' | 'done'
     - message (for status, user_message)
     - plan (for plan)
     - response (for done, full AgentResponse as dict)

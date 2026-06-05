@@ -49,6 +49,7 @@ class ParsedData:
     schema_summary: str  # human-readable column names + dtypes
     resource_id: str = ""
     metadata: str = ""
+    total_rows_in_file: Optional[int] = None  # estimate for full resource, if available
 
     def to_preview_json(self, max_rows: int = DEFAULT_PREVIEW_ROWS) -> str:
         """First N records as JSON for LLM context."""
@@ -59,6 +60,72 @@ class ParsedData:
 def _extension_from_path(path: str) -> str:
     ext = os.path.splitext(path)[1].lower()
     return ext
+
+
+def _count_file_lines(path: str) -> int:
+    count = 0
+    with open(path, "rb") as f:
+        for _ in f:
+            count += 1
+    return count
+
+
+def estimate_total_rows(path: str, resource: Optional[Dict[str, Any]] = None) -> Optional[int]:
+    """
+    Estimate total data rows in a resource file (best effort, no full parse).
+    For CSV/TSV subtracts one line for a header when present.
+    """
+    ext = _extension_from_path(path)
+    fmt = _resource_format(resource)
+    if not ext and fmt:
+        ext = f".{fmt.split('/')[-1]}" if "/" not in fmt else f".{fmt}"
+    try:
+        if ext in (".csv", ".tsv"):
+            lines = _count_file_lines(path)
+            return max(0, lines - 1) if lines > 0 else 0
+        if ext in (".jsonl", ".ndjson"):
+            return _count_file_lines(path)
+        if ext == ".json":
+            return _estimate_json_record_count(path)
+        if ext in (".xlsx", ".xls"):
+            return _estimate_excel_row_count(path, ext)
+    except Exception as e:
+        logger.debug("estimate_total_rows failed for %s: %s", path, e)
+    return None
+
+
+def _estimate_json_record_count(path: str) -> Optional[int]:
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        return None
+    if size > 10 * 1024 * 1024:
+        return None
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        data = json.load(f)
+    if isinstance(data, list):
+        return len(data)
+    if isinstance(data, dict) and data.get("type") == "FeatureCollection":
+        features = data.get("features")
+        if isinstance(features, list):
+            return len(features)
+    return None
+
+
+def _estimate_excel_row_count(path: str, ext: str) -> Optional[int]:
+    if ext == ".xlsx":
+        try:
+            import openpyxl
+        except ImportError:
+            return None
+        wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+        try:
+            ws = wb.active
+            max_row = ws.max_row or 0
+        finally:
+            wb.close()
+        return max(0, max_row - 1) if max_row > 0 else 0
+    return None
 
 
 def _resource_format(resource: Optional[Dict[str, Any]]) -> Optional[str]:
@@ -360,6 +427,7 @@ def parse_into_records(
 
     parsed.resource_id = resource_id
     parsed.metadata = metadata
+    parsed.total_rows_in_file = estimate_total_rows(path, resource)
     return parsed
 
 
@@ -409,3 +477,81 @@ def build_technical_context(
     if not parts:
         return "(No structured or unstructured data available.)"
     return "\n\n---\n\n".join(parts)
+
+
+def build_resource_context(
+    *,
+    dataset: Dict[str, Any],
+    resource: Dict[str, Any] | None,
+    url: str,
+    parsed: ParsedData | None = None,
+    unstructured_text: str | None = None,
+    resource_selector_reasoning: str = "",
+    dataset_selector_reasoning: str = "",
+    max_rows_loaded: int = 0,
+) -> str:
+    """
+    Human-readable context for the technical RLM (metadata + schema; not the full records).
+    Records are passed separately as the REPL variable `records`.
+    """
+    title = (dataset.get("title") or dataset.get("name") or "Unknown").strip()
+    org_raw = dataset.get("organization")
+    if isinstance(org_raw, dict):
+        org = (org_raw.get("name") or org_raw.get("title") or "").strip()
+    else:
+        org = (org_raw or "").strip() if isinstance(org_raw, str) else ""
+
+    lines = [
+        f"Dataset: {title}",
+    ]
+    if org:
+        lines.append(f"Organization: {org}")
+    ds_desc = (dataset.get("description") or "").strip()
+    if ds_desc:
+        lines.append(f"Dataset description: {ds_desc[:800]}{'…' if len(ds_desc) > 800 else ''}")
+
+    if resource:
+        res_title = (resource.get("title") or "").strip()
+        if res_title:
+            lines.append(f"Resource title: {res_title}")
+        fmt = (resource.get("format") or "").strip()
+        if fmt:
+            lines.append(f"Resource format: {fmt}")
+        mime = (resource.get("mime") or "").strip()
+        if mime:
+            lines.append(f"Resource MIME: {mime}")
+        size = resource.get("size")
+        if size is not None:
+            lines.append(f"Resource size (bytes): {size}")
+
+    lines.append(f"Resource URL: {url[:300]}{'…' if len(url) > 300 else ''}")
+
+    if dataset_selector_reasoning:
+        lines.append(f"Dataset selector reasoning: {dataset_selector_reasoning.strip()}")
+    if resource_selector_reasoning:
+        lines.append(f"Resource selector reasoning: {resource_selector_reasoning.strip()}")
+
+    if parsed and parsed.records:
+        lines.append(f"Rows loaded into REPL variable `records`: {parsed.row_count}")
+        if max_rows_loaded and parsed.row_count >= max_rows_loaded:
+            lines.append(
+                f"(Capped at {max_rows_loaded} rows from file; file may contain more.)"
+            )
+        lines.append(f"Columns / schema: {parsed.schema_summary}")
+        lines.append(
+            "Use Python on `records` (list of dicts). Example: "
+            "`import pandas as pd; df = pd.DataFrame(records)` — pandas may not be installed; "
+            "use plain Python if import fails."
+        )
+    elif unstructured_text:
+        lines.append(
+            "Structured parse unavailable; extracted text snippet is included below "
+            "(full text may be truncated)."
+        )
+        lines.append(unstructured_text[:20_000])
+        if len(unstructured_text) > 20_000:
+            lines.append("\n[Extracted text truncated for resource_context.]")
+    else:
+        lines.append("No rows were loaded into `records` (empty list).")
+
+    return "\n".join(lines)
