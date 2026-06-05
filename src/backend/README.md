@@ -1,6 +1,6 @@
 # Agora backend
 
-FastAPI backend for Agora: agent pipeline (planner, hybrid search, dataset selector, RAG/technical agents, synthesis) over French open data (data.gouv.fr). Embeddings and chat use Azure OpenAI; vectors live in Weaviate.
+FastAPI backend for Agora: agent pipeline (planner, hybrid search, dataset selector, RAG/technical agents, synthesis) over French open data (data.gouv.fr). Chat and embeddings use **OpenAI** or **Azure OpenAI** via `LLM_PROVIDER` in `src/.env`; vectors live in Weaviate.
 
 ## Quick reference
 
@@ -20,7 +20,18 @@ Full setup (Weaviate, Docker, env, streaming, production): **[`src/README.md`](.
 
 Pipeline for each technical dataset: **ResourceSelectorAgent** (metadata-only) → download one resource → parse → **DSPy RLM** with `records` (list of dicts, up to 50k rows) and `resource_context` (dataset/resource/schema text). The model writes Python in a sandboxed REPL to filter, aggregate, etc., and calls `llm_query()` when needed, then `SUBMIT(answer)`. Requires **Deno** for the WASM sandbox; otherwise falls back to `dspy.Predict`. Setup: `agora-setup-repl` or `uv run python -m app.scripts.setup_repl` (see `[tool.agora.repl]` in `pyproject.toml`).
 
+## LLM provider (plug-and-play)
+
+Set `LLM_PROVIDER` in `src/.env` to switch backends without code changes:
+
+| `LLM_PROVIDER` | Required env vars | Chat | Embeddings |
+|----------------|-------------------|------|------------|
+| `openai` | `OPENAI_API_KEY`, `OPENAI_CHAT_MODEL`, `OPENAI_EMBED_MODEL` | `api.openai.com` | OpenAI SDK |
+| `azure` | `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, `AZURE_OPENAI_CHAT_DEPLOYMENT`, `AZURE_OPENAI_EMBED_DEPLOYMENT` | Azure deployment | Azure OpenAI SDK |
+
+Restart the backend after changing provider. Both credential sets can stay in `.env`; only the active provider’s vars are required.
+
 ## Usage and cost tracking
 
-- **LLM usage** — Logged per agent (planner, selector, general_rag, technical_rlm, synthesis) and as a **pipeline grand total**. If the chat deployment has known pricing (e.g. gpt-5-mini in `KNOWN_MODEL_PRICING`), an estimated cost in USD is logged at the end.
-- **Embedding usage** — Logged for **pipeline** use only: search (one embed per subquery) and General agent chunk retrieval. Weaviate ingestion is not counted. If the embed deployment has known pricing (e.g. text-embedding-3-small), an estimated cost is logged after the embedding grand total.
+- **LLM usage** — Logged per agent (planner, selector, general_rag, technical_rlm, synthesis) and as a **pipeline grand total**. Cost uses `KNOWN_MODEL_PRICING` keyed by **model name** (OpenAI) or **deployment name** (Azure) when they match (e.g. `gpt-5-mini`).
+- **Embedding usage** — Logged for **pipeline** use only: search (one embed per subquery) and General agent chunk retrieval. Weaviate ingestion is not counted. Priced via `KNOWN_EMBED_PRICING` on embed model/deployment name (e.g. `text-embedding-3-small`).

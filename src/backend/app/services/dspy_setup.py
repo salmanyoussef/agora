@@ -84,20 +84,25 @@ KNOWN_MODEL_PRICING: dict[str, dict[str, float]] = {
 }
 
 
+def _lm_provider_prefix() -> str:
+    return "azure" if settings.uses_azure else "openai"
+
+
 def _is_priced_model(lm_key: str) -> bool:
-    """True if this LM key corresponds to our configured chat model and we have pricing."""
-    model = settings.openai_chat_model
-    if not model:
+    """True if this LM key matches the configured chat model/deployment with known pricing."""
+    name = settings.chat_pricing_key
+    if not name:
         return False
-    if lm_key == model or lm_key == f"openai/{model}" or lm_key.endswith(f"/{model}"):
-        return model in KNOWN_MODEL_PRICING
+    prefix = _lm_provider_prefix()
+    if lm_key == name or lm_key == f"{prefix}/{name}" or lm_key.endswith(f"/{name}"):
+        return name in KNOWN_MODEL_PRICING
     return False
 
 
 def estimate_llm_cost_usd(grand_total_usage: dict[str, Any] | None) -> float | None:
     if not grand_total_usage or not isinstance(grand_total_usage, dict):
         return None
-    model = settings.openai_chat_model
+    model = settings.chat_pricing_key
     pricing = KNOWN_MODEL_PRICING.get(model) if model else None
     if not pricing:
         return None
@@ -133,10 +138,15 @@ def estimate_and_log_pipeline_cost(grand_total_usage: dict[str, Any] | None) -> 
     """
     if not grand_total_usage or not isinstance(grand_total_usage, dict):
         return
-    model = settings.openai_chat_model
+    model = settings.chat_pricing_key
     if KNOWN_MODEL_PRICING.get(model) is not None:
         return  # Cost is on the grand total line
-    logger.info("LLM cost estimate: no pricing for model=%r (known: %s)", model, list(KNOWN_MODEL_PRICING.keys()))
+    logger.info(
+        "LLM cost estimate: no pricing for %s=%r (known: %s)",
+        "deployment" if settings.uses_azure else "model",
+        model,
+        list(KNOWN_MODEL_PRICING.keys()),
+    )
 
 
 # --- Embedding usage (pipeline only: search + General Agent chunk retrieval) ---
@@ -171,7 +181,7 @@ KNOWN_EMBED_PRICING: dict[str, float] = {
 def estimate_embedding_cost_usd(grand_total_embed_usage: dict[str, int] | None) -> float | None:
     if not grand_total_embed_usage or not grand_total_embed_usage.get("total_tokens"):
         return None
-    model = settings.openai_embed_model
+    model = settings.embed_pricing_key
     per_1M = KNOWN_EMBED_PRICING.get(model) if model else None
     if per_1M is None:
         return None
@@ -212,11 +222,12 @@ def estimate_and_log_embedding_cost(grand_total_embed_usage: dict[str, int] | No
     """
     if not grand_total_embed_usage or not grand_total_embed_usage.get("total_tokens"):
         return
-    model = settings.openai_embed_model
+    model = settings.embed_pricing_key
     if KNOWN_EMBED_PRICING.get(model) is not None:
         return  # Cost is on the grand total line
     logger.info(
-        "Embedding cost estimate: no pricing for model=%r (known: %s)",
+        "Embedding cost estimate: no pricing for %s=%r (known: %s)",
+        "deployment" if settings.uses_azure else "model",
         model,
         list(KNOWN_EMBED_PRICING.keys()),
     )
@@ -233,18 +244,32 @@ def configure_dspy() -> None:
     if _DSPY_CONFIGURED:
         return
 
-    logger.info(
-        "Configuring DSPy with OpenAI chat model=%s",
-        settings.openai_chat_model,
-    )
-
-    lm = dspy.LM(
-        f"openai/{settings.openai_chat_model}",
-        api_key=settings.openai_api_key,
-        model_type="chat",
-        temperature=None,
-        max_tokens=settings.openai_chat_max_tokens,
-    )
+    if settings.uses_azure:
+        logger.info(
+            "Configuring DSPy with Azure OpenAI chat deployment=%s (LLM_PROVIDER=azure)",
+            settings.azure_openai_chat_deployment,
+        )
+        lm = dspy.LM(
+            f"azure/{settings.azure_openai_chat_deployment}",
+            api_key=settings.azure_openai_api_key,
+            api_base=settings.azure_openai_endpoint,
+            api_version=settings.azure_openai_chat_api_version,
+            model_type="chat",
+            temperature=None,
+            max_tokens=settings.openai_chat_max_tokens,
+        )
+    else:
+        logger.info(
+            "Configuring DSPy with OpenAI chat model=%s (LLM_PROVIDER=openai)",
+            settings.openai_chat_model,
+        )
+        lm = dspy.LM(
+            f"openai/{settings.openai_chat_model}",
+            api_key=settings.openai_api_key,
+            model_type="chat",
+            temperature=None,
+            max_tokens=settings.openai_chat_max_tokens,
+        )
     _LM = lm
 
     dspy.configure(lm=lm)
