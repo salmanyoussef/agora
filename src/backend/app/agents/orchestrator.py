@@ -48,6 +48,25 @@ def _emit_evidence_sse(
     )
 
 
+def _selected_dataset_record(
+    *,
+    dataset_id: str,
+    ref: dict,
+    execution_mode: str,
+    reasoning: str,
+    subquery: str,
+) -> dict:
+    return {
+        "dataset_id": dataset_id,
+        "title": ref.get("title") or "Unknown dataset",
+        "organization": ref.get("organization") or "",
+        "url": ref.get("url") or "",
+        "execution_mode": execution_mode,
+        "reasoning": reasoning or "",
+        "subquery": subquery,
+    }
+
+
 def _dataset_ref_from_hit(hit: dict) -> dict:
     """Build a reference dict (title, organization, url) for a dataset hit."""
     dataset_id = hit.get("dataset_id") or hit.get("id") or ""
@@ -94,6 +113,7 @@ def _stream_run_impl(
     evidence_blocks = []
     all_hits = []
     user_messages = []
+    selected_datasets: list[dict] = []
     used_dataset_refs: list[dict] = []
     seen_dataset_ids: set[str] = set()
 
@@ -151,7 +171,16 @@ def _stream_run_impl(
                         msg = f"{msg} | {url}"
                     user_messages.append(msg)
                     yield {"event": "user_message", "message": msg}
-                    did = hit.get("dataset_id")
+                    did = hit.get("dataset_id") or sel.dataset_id
+                    selected_datasets.append(
+                        _selected_dataset_record(
+                            dataset_id=str(did or sel.dataset_id),
+                            ref=ref,
+                            execution_mode=sel.execution_mode,
+                            reasoning=sel.reasoning or "",
+                            subquery=sub.question,
+                        )
+                    )
                     if did and did not in seen_dataset_ids:
                         seen_dataset_ids.add(did)
                         used_dataset_refs.append(ref)
@@ -218,7 +247,16 @@ def _stream_run_impl(
                     msg = f"{msg} | {url}"
                 user_messages.append(msg)
                 yield {"event": "user_message", "message": msg}
-                did = hit.get("dataset_id")
+                did = hit.get("dataset_id") or hit.get("id") or ""
+                selected_datasets.append(
+                    _selected_dataset_record(
+                        dataset_id=str(did),
+                        ref=ref,
+                        execution_mode="rag",
+                        reasoning="",
+                        subquery=sub.question,
+                    )
+                )
                 if did and did not in seen_dataset_ids:
                     seen_dataset_ids.add(did)
                     used_dataset_refs.append(ref)
@@ -259,10 +297,12 @@ def _stream_run_impl(
         estimate_and_log_embedding_cost(embed_grand_total_stream)
 
     response = AgentResponse(
+        question=question,
         answer=answer,
         plan=plan,
         evidence=evidence_blocks,
         hits=all_hits,
+        selected_datasets=selected_datasets,
         user_messages=user_messages,
         lm_usage_grand_total=grand_total_stream if grand_total_stream else None,
         embed_usage_grand_total=embed_grand_total_stream if embed_grand_total_stream.get("total_tokens") else None,
@@ -301,6 +341,7 @@ class AgentOrchestrator:
         evidence_blocks = []
         all_hits = []
         user_messages = []
+        selected_datasets: list[dict] = []
         used_dataset_refs: list[dict] = []
         seen_dataset_ids: set[str] = set()
 
@@ -382,7 +423,16 @@ class AgentOrchestrator:
                             msg = f"{msg} | {url}"
                         user_messages.append(msg)
                         logger.info("User message: %s", msg)
-                        did = hit.get("dataset_id")
+                        did = hit.get("dataset_id") or sel.dataset_id
+                        selected_datasets.append(
+                            _selected_dataset_record(
+                                dataset_id=str(did or sel.dataset_id),
+                                ref=ref,
+                                execution_mode=sel.execution_mode,
+                                reasoning=sel.reasoning or "",
+                                subquery=sub.question,
+                            )
+                        )
                         if did and did not in seen_dataset_ids:
                             seen_dataset_ids.add(did)
                             used_dataset_refs.append(ref)
@@ -441,7 +491,16 @@ class AgentOrchestrator:
                         msg = f"{msg} | {url}"
                     user_messages.append(msg)
                     logger.info("User message: %s", msg)
-                    did = hit.get("dataset_id")
+                    did = hit.get("dataset_id") or hit.get("id") or ""
+                    selected_datasets.append(
+                        _selected_dataset_record(
+                            dataset_id=str(did),
+                            ref=ref,
+                            execution_mode="rag",
+                            reasoning="",
+                            subquery=sub.question,
+                        )
+                    )
                     if did and did not in seen_dataset_ids:
                         seen_dataset_ids.add(did)
                         used_dataset_refs.append(ref)
@@ -489,10 +548,12 @@ class AgentOrchestrator:
             estimate_and_log_embedding_cost(embed_grand_total)
 
         return AgentResponse(
+            question=question,
             answer=answer,
             plan=plan,
             evidence=evidence_blocks,
             hits=all_hits,
+            selected_datasets=selected_datasets,
             user_messages=user_messages,
             lm_usage_grand_total=grand_total if grand_total else None,
             embed_usage_grand_total=embed_grand_total if embed_grand_total.get("total_tokens") else None,

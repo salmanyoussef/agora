@@ -428,6 +428,34 @@
     .result-content.show-answer .pipeline-cost:not(:empty) {
       display: block;
     }
+    .export-actions {
+      display: none;
+      margin-top: 1rem;
+    }
+    .result-content.show-answer .export-actions {
+      display: block;
+    }
+    .btn-export {
+      padding: 0.5rem 1rem;
+      background: var(--surface);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .btn-export:hover:not(:disabled) {
+      color: var(--text);
+      border-color: var(--text-tertiary);
+      background: var(--bg);
+    }
+    .btn-export:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
     .pipeline-cost strong {
       color: var(--text);
       font-weight: 600;
@@ -509,6 +537,9 @@
         <div class="answer-body-wrap">
           <div id="answer" class="answer-body"></div>
           <div id="pipeline-cost" class="pipeline-cost"></div>
+          <div id="export-actions" class="export-actions">
+            <button type="button" id="export-pipeline" class="btn-export" disabled>Export pipeline run</button>
+          </div>
         </div>
       </div>
     </section>
@@ -733,6 +764,9 @@
     }
 
     const pipelineCostEl = document.getElementById("pipeline-cost");
+    const exportBtn = document.getElementById("export-pipeline");
+
+    let lastPipelineExport = null;
 
     function setPipelineCost(costUsd) {
       if (!pipelineCostEl) return;
@@ -741,6 +775,60 @@
         return;
       }
       pipelineCostEl.innerHTML = "<strong>Total cost:</strong> $" + escapeHtml(String(costUsd)) + " USD";
+    }
+
+    function setExportAvailable(available) {
+      if (exportBtn) exportBtn.disabled = !available;
+    }
+
+    function buildPipelineExportPayload(question, mode, response, evidenceDetails) {
+      const evidence = (response.evidence || []).map((block, i) => {
+        const detail = evidenceDetails[i] || {};
+        return {
+          mode: block.mode,
+          subquery: block.subquery,
+          dataset_title: detail.dataset_title || null,
+          dataset_url: detail.dataset_url || null,
+          dataset_organization: detail.dataset_organization || null,
+          resource_title: block.resource_title || detail.resource_title || null,
+          repl_rows: block.repl_rows ?? detail.repl_rows ?? null,
+          resource_total_rows: block.resource_total_rows ?? detail.resource_total_rows ?? null,
+          evidence: block.evidence || "",
+        };
+      });
+      return {
+        exported_at: new Date().toISOString(),
+        question: response.question || question,
+        mode: mode,
+        plan: {
+          intent: response.plan?.intent || "",
+          subqueries: response.plan?.subqueries || [],
+        },
+        hits: response.hits || [],
+        selected_datasets: response.selected_datasets || [],
+        evidence: evidence,
+        user_messages: response.user_messages || [],
+        answer: response.answer || "",
+        pipeline_cost_usd: response.pipeline_cost_usd || null,
+      };
+    }
+
+    function downloadPipelineExport() {
+      if (!lastPipelineExport) return;
+      const json = JSON.stringify(lastPipelineExport, null, 2);
+      const blob = new Blob([json], { type: "application/json" });
+      const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "agora-pipeline-" + stamp + ".json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(a.href);
+    }
+
+    if (exportBtn) {
+      exportBtn.addEventListener("click", downloadPipelineExport);
     }
 
     let abortController = null;
@@ -861,7 +949,10 @@
       clearEvidenceLog();
       setAnswer("");
       setPipelineCost(null);
+      lastPipelineExport = null;
+      setExportAvailable(false);
       let evidenceCardCount = 0;
+      const evidenceDetails = [];
       submitBtn.disabled = true;
       btnSlot.classList.add("btn-slot--loading");
       abortController = new AbortController();
@@ -904,6 +995,14 @@
               }
               else if (data.event === "technical_repl") appendTechnicalReplMessage(data);
               else if (data.event === "evidence") {
+                evidenceDetails.push({
+                  dataset_title: data.dataset_title,
+                  dataset_url: data.dataset_url,
+                  dataset_organization: data.dataset_organization,
+                  resource_title: data.resource_title,
+                  repl_rows: data.repl_rows,
+                  resource_total_rows: data.resource_total_rows,
+                });
                 appendEvidenceCard(data);
                 evidenceCardCount += 1;
               }
@@ -929,6 +1028,13 @@
                 }
                 setAnswer(r.answer || "");
                 setPipelineCost(r.pipeline_cost_usd);
+                lastPipelineExport = buildPipelineExportPayload(
+                  question,
+                  selectedMode,
+                  r,
+                  evidenceDetails
+                );
+                setExportAvailable(true);
                 resultHeading.textContent = "Answer";
                 resultContent.classList.remove("show-progress");
                 resultContent.classList.add("show-answer");
