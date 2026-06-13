@@ -60,27 +60,25 @@ def run_one(orchestrator: AgentOrchestrator, entry: dict, k: int) -> dict:
     subqueries = [sq.question for sq in (plan.subqueries if plan else [])]
 
     # ---- dataset selection + routing ----
+    # selected_datasets is List[Dict[str, Any]] in AgentResponse
     selected = result.selected_datasets or []
     routing_counts = {}
     dataset_decisions = []
     for ds in selected:
-        mode = getattr(ds, "execution_mode", "unknown")
+        mode = ds.get("execution_mode", "unknown") if isinstance(ds, dict) else getattr(ds, "execution_mode", "unknown")
         routing_counts[mode] = routing_counts.get(mode, 0) + 1
+        did = ds.get("dataset_id") if isinstance(ds, dict) else getattr(ds, "dataset_id", None)
         dataset_decisions.append({
-            "dataset_id": getattr(ds, "dataset_id", None),
-            "title": getattr(ds, "title", None),
+            "dataset_id": did,
             "execution_mode": mode,
+            "reasoning": ds.get("reasoning", "") if isinstance(ds, dict) else "",
         })
 
     # ---- usage / cost ----
-    usage_raw = getattr(result, "usage", None) or {}
-    total_tokens = 0
-    cost_usd = None
-    for v in (usage_raw.values() if hasattr(usage_raw, "values") else []):
-        if hasattr(v, "total_tokens"):
-            total_tokens += v.total_tokens
-        if hasattr(v, "cost_usd") and v.cost_usd is not None:
-            cost_usd = (cost_usd or 0) + v.cost_usd
+    # AgentResponse exposes pipeline_cost_usd (str) and lm_usage_grand_total (dict)
+    cost_usd = result.pipeline_cost_usd  # decimal string or None
+    usage_grand = result.lm_usage_grand_total or {}
+    total_tokens = usage_grand.get("total", 0)
 
     record = {
         "id": qid,

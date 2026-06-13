@@ -1,0 +1,38 @@
+[
+  {
+    "id": "Q5",
+    "question": "Quelles sont les communes françaises ayant une population supérieure à 100 000 habitants ?",
+    "type": "analytical",
+    "domain": "demographics",
+    "elapsed_s": 123.1,
+    "subqueries": [
+      "population légale par commune INSEE population municipale par commune CSV populations légales 2020 2021 2022 2023 liste communes France"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 5,
+    "datasets_selected": 3,
+    "routing_counts": {
+      "technical": 3
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "65b1a75854fb88f787f72944",
+        "execution_mode": "technical",
+        "reasoning": "Table 'Population municipale des communes - France entière' couvrant les communes depuis 2013 ; nécessaire pour rechercher et filtrer toutes les communes par population municipale et extraire celles >100 000."
+      },
+      {
+        "dataset_id": "6953c04fd58bdcf069a2e6d2",
+        "execution_mode": "technical",
+        "reasoning": "Jeu 'Populations de référence' (INSEE) fournissant les populations légales officielles ; utile pour obtenir la liste officielle des communes dont la population légale dépasse 100 000."
+      },
+      {
+        "dataset_id": "60ca931a789e45a2b52ee2c1",
+        "execution_mode": "technical",
+        "reasoning": "Jeu 'Populations légales Communes et Arrondissements Municipaux - Millésimé' couvrant les millésimes 2018–2023 ; permet de choisir l'année/millésime précis et de calculer/filtrer les communes >100 000 pour l'année souhaitée."
+      }
+    ],
+    "answer": "Voici la liste des communes (ou arrondissements municipaux) dont la population municipale 2023 (p23_pop) est >= 100 000 habitants, extraite du pré‑affichage du fichier \"POPULATION_MUNICIPALE_COMMUNES_FRANCE.xlsx\" :\n\n1. Toulouse (31555) — 514 819  \n2. Nice (06088) — 357 737  \n3. Nantes (44109) — 327 734  \n4. Montpellier (34172) — 310 240  \n5. Strasbourg (67482) — 293 771  \n6. Bordeaux (33063) — 267 991  \n7. Lille (59350) — 238 246  \n8. Rennes (35238) — 230 890  \n9. Paris 15e Arrondissement (75115) — 229 713  \n10. Paris 20e Arrondissement (75120) — 185 140  \n11. Paris 18e Arrondissement (75118) — 183 127  \n12. Paris 13e Arrondissement (75113) — 181 271  \n13. Toulon (83137) — 179 116  \n14. Paris 19e Arrondissement (75119) — 178 691  \n15. Reims (51454) — 177 674  \n16. Saint‑Étienne (42218) — 173 136  \n17. Le Havre (76351) — 166 687  \n18. Villeurbanne (69266) — 163 684  \n19. Dijon (21231) — 161 830  \n20. Paris 16e Arrondissement (75116) — 159 386  \n21. Paris 17e Arrondissement (75117) — 159 212  \n22. Angers (49007) — 159 022  \n23. Grenoble (38185) — 156 140  \n24. Saint‑Denis (97411) — 155 634  \n25. Nîmes (30189) — 151 839  \n26. Aix‑en‑Provence (13001) — 149 695  \n27. Saint‑Denis (93066) — 149 077  \n28. Clermont‑Ferrand (63113) — 146 351  \n29. Le Mans (72181) — 146 249  \n30. Brest (29019) — 142 346  \n31. Tours (37261) — 139 259  \n32. Paris 11e Arrondissement (75111) — 138 170  \n33. Paris 12e Arrondissement (75112) — 138 024  \n34. Paris 14e Arrondissement (75114) — 136 455  \n35. Amiens (80021) — 136 449  \n36. Annecy (74010) — 132 117  \n37. Limoges (87085) — 129 937  \n38. Metz (57463) — 122 572  \n39. Perpignan (66136) — 121 616  \n40. Boulogne‑Billancourt (92012) — 119 019  \n41. Besançon (25056) — 118 489  \n42. Rouen (76540) — 117 662  \n43. Orléans (45234) — 116 357  \n44. Montreuil (93048) — 111 934  \n45. Caen (14118) — 109 400  \n46. Saint‑Paul (97415) — 108 088  \n47. Argenteuil (95018) — 106 130  \n48. Mulhouse (68224) — 104 978  \n49. Nancy (54395) — 103 671  \n50. Lyon 3e Arrondissement (69383) — 100 679\n\nSources et références pour vérification\n- \"Population municipale des communes - France entière\" (pré‑affichage du fichier POPULATION_MUNICIPALE_COMMUNES_FRANCE.xlsx) — jeu disponible sur data.gouv.fr : https://www.data.gouv.fr/datasets/population-municipale-des-communes-france-entiere\n- Série officielle INSEE \"Populations de référence\" (recensement / populations légales) : https://www.data.gouv.fr/datasets/populations-de-reference-1 et métadonnée Insee : https://www.insee.fr/fr/metadonnees/source/serie/s1321\n\nRemarques et limites\n- La liste ci‑dessus provient de l'extrait (pré‑affichage) fourni et correspond à la colonne p23_pop (population municipale 2023). Pour confirmer ces chiffres, obtenir d'autres millésimes (2020–2022) ou télécharger l'intégralité du tableau, téléchargez le/les fichier(s) CSV complets depuis les ressources INSEE/data.gouv.fr citées.  \n- Notez que certains codes correspondent à des arrondissements municipaux (Paris, Lyon) qui apparaissent dans ces séries.\n\nCette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).",
+    "total_tokens": 0,
+    "cost_usd": "0.02752064"
+  }
+]

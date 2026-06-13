@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import zipfile
 from dataclasses import dataclass
 from typing import Any, Dict, List, Literal, Optional
 
@@ -51,10 +52,103 @@ class ParsedData:
     metadata: str = ""
     total_rows_in_file: Optional[int] = None  # estimate for full resource, if available
 
+    def _find_sort_column(self) -> Optional[str]:
+        """Return the numeric column with the highest max value across a sample."""
+        best_col: Optional[str] = None
+        best_max: float = 0.0
+        _sample = self.records[:500]
+        for col in self.columns:
+            vals: list[float] = []
+            for r in _sample:
+                raw = r.get(col)
+                if raw is None:
+                    continue
+                try:
+                    v = float(str(raw).replace(",", ".").strip())
+                    vals.append(v)
+                except (ValueError, TypeError):
+                    pass
+            if vals and max(vals) > best_max:
+                best_max = max(vals)
+                best_col = col
+        return best_col
+
+    def _sorted_preview(self, max_rows: int, best_col: Optional[str]) -> List[Dict[str, Any]]:
+        """Return records sorted by best_col descending, truncated to max_rows."""
+        if len(self.records) <= max_rows:
+            return self.records
+        if best_col:
+            def _key(r: Dict[str, Any]) -> float:
+                raw = r.get(best_col)
+                if raw is None:
+                    return 0.0
+                try:
+                    return float(str(raw).replace(",", ".").strip())
+                except (ValueError, TypeError):
+                    return 0.0
+            return sorted(self.records, key=_key, reverse=True)[:max_rows]
+        return self.records[:max_rows]
+
     def to_preview_json(self, max_rows: int = DEFAULT_PREVIEW_ROWS) -> str:
-        """First N records as JSON for LLM context."""
-        preview = self.records[:max_rows]
+        """
+        Return up to max_rows records as JSON. When truncating, sort by the
+        numeric column with the highest maximum value (descending) so that
+        extreme-value rows appear in the preview rather than alphabetical head.
+        """
+        best_col = self._find_sort_column()
+        preview = self._sorted_preview(max_rows, best_col)
         return json.dumps(preview, ensure_ascii=False, indent=2)
+
+    def to_compact_preview_table(
+        self, max_rows: int = DEFAULT_PREVIEW_ROWS, max_cols: int = 8
+    ) -> str:
+        """
+        Compact pipe-separated table of the top max_rows records using key columns only.
+        Far more token-efficient than full JSON when records have many columns.
+        """
+        best_col = self._find_sort_column()
+        preview = self._sorted_preview(max_rows, best_col)
+        if not preview:
+            return "(empty)"
+
+        all_cols = list(preview[0].keys()) if preview else self.columns
+
+        if len(all_cols) <= max_cols:
+            cols = all_cols
+        else:
+            priority: list[tuple[int, int, str]] = []
+            for i, col in enumerate(all_cols):
+                key = col.lower()
+                if col == best_col:
+                    p = 0
+                elif any(k in key for k in ("lib", "nom", "name", "label", "intitule")):
+                    p = 1
+                elif any(k in key for k in ("codgeo", "code", "geo", "id")):
+                    p = 2
+                elif any(k in key for k in ("dep", "dept", "reg")):
+                    p = 3
+                elif any(k in key for k in ("pop", "total", "mun", "municipal")):
+                    p = 4
+                else:
+                    p = 99
+                priority.append((p, i, col))
+            priority.sort(key=lambda x: (x[0], x[1]))
+            cols = [col for _, _, col in priority[:max_cols]]
+
+        def _fmt(v: Any) -> str:
+            if v is None:
+                return ""
+            # Only convert float x.0 -> int for actual float/int types, not strings
+            # (string "06088" must keep leading zero for geographic codes).
+            if isinstance(v, float) and v == int(v):
+                return str(int(v))
+            return str(v)[:60]
+
+        rows_out = [" | ".join(cols)]
+        for row in preview:
+            rows_out.append(" | ".join(_fmt(row.get(col)) for col in cols))
+        return "\n".join(rows_out)
+
 
 
 def _extension_from_path(path: str) -> str:
@@ -213,14 +307,37 @@ def _parse_tabular(
         "low_memory": False,
     }
     if ext == ".csv":
-        # Read only first N columns from the start so we never load 700+ columns into memory.
+        # Auto-detect delimiter (comma, semicolon, tab, pipe, etc.) then cap columns.
         try:
-            header_df = pd.read_csv(path, nrows=0, encoding="utf-8", on_bad_lines="skip")
+            header_df = pd.read_csv(
+                path, nrows=0, sep=None, engine="python",
+                encoding="utf-8", on_bad_lines="skip",
+            )
             ncols = len(header_df.columns)
+            detected_sep = header_df._constructor_sliced  # not available; use sniffer below
+        except Exception:
+            header_df = None
+            ncols = None
+        # Determine actual separator from the first line.
+        detected_sep = ","
+        try:
+            import csv as _csv
+            with open(path, "r", encoding="utf-8", errors="replace") as _f:
+                sample = _f.read(4096)
+            detected_sep = _csv.Sniffer().sniff(sample, delimiters=",;\t|").delimiter
+        except Exception:
+            pass
+        try:
+            header_df2 = pd.read_csv(
+                path, nrows=0, sep=detected_sep,
+                encoding="utf-8", on_bad_lines="skip",
+            )
+            ncols = len(header_df2.columns)
             usecols = list(range(min(MAX_TABULAR_COLUMNS, ncols)))
             read_csv_kw["usecols"] = usecols
         except Exception as e:
-            logger.debug("Could not get CSV header for usecols, reading all columns: %s", e)
+            logger.debug("Could not get CSV header for usecols: %s", e)
+        read_csv_kw["sep"] = detected_sep
         df = pd.read_csv(path, **read_csv_kw)
     elif ext == ".tsv":
         try:
@@ -399,6 +516,57 @@ def _parse_records(
     )
 
 
+def _is_zip(path: str) -> bool:
+    """Return True if the file starts with a ZIP magic header (PK\\x03\\x04)."""
+    try:
+        with open(path, "rb") as f:
+            return f.read(4) == b"PK\x03\x04"
+    except OSError:
+        return False
+
+
+def _best_structured_member(zip_path: str) -> Optional[str]:
+    """
+    Return the name of the most useful structured file inside a ZIP.
+    Prefers CSV/TSV by size descending, then JSON variants, then Excel.
+    Returns None if no structured member found.
+    """
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            candidates = []
+            for m in zf.infolist():
+                if m.is_dir():
+                    continue
+                ext = os.path.splitext(m.filename.lower())[1]
+                if ext in STRUCTURED_EXTENSIONS:
+                    if ext in (".csv", ".tsv"):
+                        priority = 0
+                    elif ext in (".json", ".jsonl", ".ndjson", ".geojson"):
+                        priority = 1
+                    else:
+                        priority = 2
+                    candidates.append((priority, -m.file_size, m.filename))
+            if not candidates:
+                return None
+            candidates.sort()
+            return candidates[0][2]
+    except Exception as e:
+        logger.debug("_best_structured_member failed for %s: %s", zip_path, e)
+        return None
+
+
+def _extract_member(zip_path: str, member_name: str, dest_dir: str) -> Optional[str]:
+    """Extract one member from a ZIP; return its path on disk, or None on failure."""
+    try:
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            zf.extract(member_name, dest_dir)
+        extracted = os.path.join(dest_dir, member_name)
+        return extracted if os.path.exists(extracted) else None
+    except Exception as e:
+        logger.debug("_extract_member failed for %s/%s: %s", zip_path, member_name, e)
+        return None
+
+
 def parse_into_records(
     path: str,
     resource: Optional[Dict[str, Any]] = None,
@@ -409,8 +577,23 @@ def parse_into_records(
     """
     If the resource is structured, parse it into a normalized list of records
     plus schema summary. Returns None if structure is unsuitable or parsing fails.
+    ZIP archives are transparently unpacked: the largest structured member (CSV,
+    JSON, XLSX, …) is extracted and parsed in place of the archive itself.
     """
     kind = detect_structure(path, resource)
+
+    # ZIP handling: peek inside and use the best structured member.
+    if kind == "unsuitable" and (_extension_from_path(path) == ".zip" or _is_zip(path)):
+        member = _best_structured_member(path)
+        if member:
+            dest_dir = os.path.dirname(path) or "."
+            extracted = _extract_member(path, member, dest_dir)
+            if extracted:
+                logger.info("ZIP resource: using extracted member %r", member)
+                kind = detect_structure(extracted)
+                if kind != "unsuitable":
+                    path = extracted
+
     if kind == "unsuitable":
         logger.debug("parse_into_records: unsuitable structure for %s", path)
         return None
@@ -543,6 +726,12 @@ def build_resource_context(
             "`import pandas as pd; df = pd.DataFrame(records)` — pandas may not be installed; "
             "use plain Python if import fails."
         )
+        lines.append(
+            "Preview (top 100 rows sorted by largest numeric column desc;"
+            " use directly if REPL is unavailable; key columns shown):\n"
+            "(codgeo/name/population columns selected for readability)"
+        )
+        lines.append(parsed.to_compact_preview_table(max_rows=100))
     elif unstructured_text:
         lines.append(
             "Structured parse unavailable; extracted text snippet is included below "

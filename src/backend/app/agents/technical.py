@@ -99,39 +99,29 @@ def _explore_with_rlm(
     records: List[Dict[str, Any]],
     resource_context: str,
     focus: str = "",
+    deno_available: bool = True,
 ) -> tuple[str, dict | None]:
     configure_dspy()
     focus_text = (focus or "(No specific focus provided.)").strip()
     logger.info(
-        "TechnicalAgent RLM call: question_len=%d records=%d context_len=%d focus_len=%d",
+        "TechnicalAgent RLM call: question_len=%d records=%d context_len=%d focus_len=%d deno=%s",
         len(question),
         len(records),
         len(resource_context),
         len(focus_text),
+        deno_available,
     )
     started_at = time.perf_counter()
     use_rlm = True
     pred = None
 
-    try:
-        rlm = dspy.RLM(
-            ExploreTechnicalContext,
-            max_iterations=RLM_MAX_ITERATIONS,
-            max_llm_calls=RLM_MAX_LLM_CALLS,
-            verbose=RLM_VERBOSE,
-        )
-        pred = rlm(
-            records=records,
-            resource_context=resource_context,
-            question=question,
-            focus=focus_text,
-        )
-    except Exception as e:
+    if not deno_available:
+        # REPL cannot execute code without Deno — skip RLM entirely to avoid
+        # 15 iterations of failed code execution. Use a single Predict call so
+        # the LLM reads the compact preview table from resource_context directly.
         use_rlm = False
-        logger.warning(
-            "TechnicalAgent: RLM REPL unavailable (%s), falling back to Predict. "
-            "For full RLM, run: uv run python -m app.scripts.setup_repl",
-            e,
+        logger.info(
+            "TechnicalAgent: Deno not available — using Predict (single call) instead of RLM"
         )
         pred = dspy.Predict(ExploreTechnicalContext)(
             records=records,
@@ -139,6 +129,33 @@ def _explore_with_rlm(
             question=question,
             focus=focus_text,
         )
+    else:
+        try:
+            rlm = dspy.RLM(
+                ExploreTechnicalContext,
+                max_iterations=RLM_MAX_ITERATIONS,
+                max_llm_calls=RLM_MAX_LLM_CALLS,
+                verbose=RLM_VERBOSE,
+            )
+            pred = rlm(
+                records=records,
+                resource_context=resource_context,
+                question=question,
+                focus=focus_text,
+            )
+        except Exception as e:
+            use_rlm = False
+            logger.warning(
+                "TechnicalAgent: RLM REPL unavailable (%s), falling back to Predict. "
+                "For full RLM, run: uv run python -m app.scripts.setup_repl",
+                e,
+            )
+            pred = dspy.Predict(ExploreTechnicalContext)(
+                records=records,
+                resource_context=resource_context,
+                question=question,
+                focus=focus_text,
+            )
 
     elapsed_ms = (time.perf_counter() - started_at) * 1000
     logger.info(
@@ -166,27 +183,38 @@ class ExploreTechnicalContext(dspy.Signature):
     """
     Technical step over French open government data. You receive:
 
-    - `records`: list of dicts (up to 50,000 rows) loaded from ONE dataset resource.
-      Explore with Python in the REPL: len(records), filtering, aggregates, sorting.
-      Prefer plain Python; try pandas only if available.
-    - `resource_context`: metadata (dataset title, resource format/URL, column schema).
+    - `records`: list of dicts loaded from ONE dataset resource. When the REPL is
+      available, explore with Python (filtering, aggregates, sorting). Prefer plain
+      Python; try pandas only if available.
+    - `resource_context`: dataset/resource metadata, column schema, and a PREVIEW
+      table (pipe-separated, key columns only, top rows sorted by largest numeric
+      column descending). The preview appears under "Preview (top N rows...)".
+
+    WHEN records IS EMPTY or REPL is unavailable:
+    Read the Preview table in `resource_context` directly and answer from it.
+    The preview is sorted so the highest-value rows appear FIRST. For threshold
+    queries (e.g. population > 100 000), ALL qualifying rows are at the top of
+    the table — enumerate every row that meets the criterion, do NOT say the
+    data is unavailable if the preview contains relevant rows.
 
     Answer the subquery using only this data. Your output becomes evidence for synthesis.
     Same language as the question (typically French).
     """
 
     records = dspy.InputField(
-        desc="List of row dicts for REPL (up to 50k). Primary data to analyze."
+        desc="Row dicts for REPL. Empty when REPL is unavailable — use Preview table "
+             "from resource_context in that case."
     )
     resource_context = dspy.InputField(
-        desc="Dataset and resource metadata, schema summary, selector reasoning."
+        desc="Metadata + Preview table (pipe-separated, top rows sorted by largest "
+             "numeric column desc). Read the Preview directly when records is empty."
     )
     question = dspy.InputField(desc="The subquery to answer.")
     focus = dspy.InputField(
         desc="Why this dataset/resource was chosen for this subquery."
     )
     answer = dspy.OutputField(
-        desc="Structured evidence block from analyzing `records` (same language as question)."
+        desc="Structured evidence block from analyzing the data (same language as question)."
     )
 
 
@@ -336,16 +364,33 @@ class TechnicalAgent:
                 path = download_file(url, out_dir, resource=resource)
             except Exception as e:
                 logger.warning("TechnicalAgent: download failed %s: %s", url[:80], e)
-                yield ExecutionResult(
-                    mode="technical",
-                    subquery=subquery,
-                    evidence=f"Technical analysis failed: could not download resource ({e!s}).",
-                    lm_usage=merge_lm_usage(usage_parts) or None,
-                    repl_rows=0,
-                    resource_title=res_title,
-                    max_repl_rows=MAX_ROWS_REPL,
-                )
-                return
+                # Try remaining resources from the same dataset before giving up.
+                path = None
+                for alt_item in url_items:
+                    alt_url = alt_item.get("url")
+                    if not alt_url or alt_url == url:
+                        continue
+                    alt_res = alt_item.get("resource")
+                    alt_title = _resource_display_title(alt_res, alt_url)
+                    yield f"Primary resource unavailable; retrying with «{alt_title}»…"
+                    try:
+                        path = download_file(alt_url, out_dir, resource=alt_res)
+                        url, resource, res_title = alt_url, alt_res, alt_title
+                        logger.info("TechnicalAgent: fallback download succeeded: %s", alt_url[:80])
+                        break
+                    except Exception as alt_e:
+                        logger.warning("TechnicalAgent: fallback failed %s: %s", alt_url[:80], alt_e)
+                if path is None:
+                    yield ExecutionResult(
+                        mode="technical",
+                        subquery=subquery,
+                        evidence=f"Technical analysis failed: could not download resource or any fallback ({e!s}).",
+                        lm_usage=merge_lm_usage(usage_parts) or None,
+                        repl_rows=0,
+                        resource_title=res_title,
+                        max_repl_rows=MAX_ROWS_REPL,
+                    )
+                    return
 
             yield f"Download complete. Parsing «{res_title}»…"
 
@@ -421,13 +466,40 @@ class TechnicalAgent:
             )
             return
 
-        yield "Exploring data in Python REPL…"
+        import shutil as _shutil
+        deno_available = _shutil.which("deno") is not None
+        if deno_available:
+            yield "Exploring data in Python REPL…"
+        else:
+            yield "Exploring data (no REPL — reading preview directly)…"
+
+        # When Deno is unavailable, the REPL cannot execute code, so passing thousands
+        # of records only wastes context window space. Pass an empty list so the LLM
+        # reads the compact preview table embedded in resource_context instead.
+        # When Deno IS available, cap to 100 sorted rows for context efficiency.
+        MAX_LLM_RECORDS = 100
+        if not deno_available:
+            records_for_rlm: list = []
+            logger.info(
+                "TechnicalAgent: Deno not found — passing empty records, LLM will use preview table"
+            )
+        elif parsed and len(records) > MAX_LLM_RECORDS:
+            import json as _json
+            records_for_rlm = _json.loads(parsed.to_preview_json(max_rows=MAX_LLM_RECORDS))
+            logger.info(
+                "TechnicalAgent: capping records for RLM %d → %d (sorted preview)",
+                len(records),
+                len(records_for_rlm),
+            )
+        else:
+            records_for_rlm = records
 
         evidence, tech_usage = _explore_with_rlm(
             subquery,
-            records,
+            records_for_rlm,
             resource_context,
             focus=focus,
+            deno_available=deno_available,
         )
         if tech_usage:
             usage_parts.append(tech_usage)
