@@ -1,0 +1,4 @@
+id: Q4
+domain: finance
+type: discovery
+question: Quels sont les jeux de données disponibles sur le budget des communes françaises ?

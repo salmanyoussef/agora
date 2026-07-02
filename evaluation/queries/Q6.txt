@@ -1,0 +1,4 @@
+id: Q6
+domain: education
+type: discovery
+question: Quels jeux de données concernent les établissements scolaires en France ?

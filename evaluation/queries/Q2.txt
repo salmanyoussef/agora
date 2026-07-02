@@ -1,0 +1,4 @@
+id: Q2
+domain: transport
+type: discovery
+question: Quelles données sur les accidents de la route en France sont disponibles sur data.gouv.fr ?

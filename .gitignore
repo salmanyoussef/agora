@@ -34,3 +34,7 @@ src/infra/weaviate_backup.tar.gz
 docs/paper/PROMPT_FOR_REFERENCE_SEARCH.md
 # Paper (LaTeX, figures, bibliography — keep local; do not commit) - remove when published
 docs/paper/
+
+# Q5 intermediate run artifacts
+evaluation/eval_results_q5_*.json
+evaluation/q5_*.log

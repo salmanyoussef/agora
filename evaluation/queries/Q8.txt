@@ -1,0 +1,4 @@
+id: Q8
+domain: energy
+type: analytical
+question: Combien de bornes de recharge pour véhicules électriques sont référencées en France ?
