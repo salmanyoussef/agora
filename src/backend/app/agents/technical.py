@@ -174,7 +174,10 @@ def _explore_with_rlm(
         "TechnicalAgent DSPy response trace (last %d call(s)):",
         n_history,
     )
-    dspy.inspect_history(n=n_history)
+    try:
+        dspy.inspect_history(n=n_history)
+    except Exception:
+        pass
     log_lm_usage("technical_rlm" if use_rlm else "technical_predict_fallback", usage)
     return pred.answer or "No answer could be produced from the technical context.", usage
 

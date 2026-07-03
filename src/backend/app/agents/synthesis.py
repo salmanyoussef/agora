@@ -96,6 +96,9 @@ class SynthesisAgent:
             pass
         log_last_lm_call(caller="synthesis")
         logger.info("SynthesisAgent DSPy response trace (last call):")
-        dspy.inspect_history(n=1)
+        try:
+            dspy.inspect_history(n=1)
+        except Exception:
+            pass
         log_lm_usage("synthesis", usage)
         return result.answer, usage

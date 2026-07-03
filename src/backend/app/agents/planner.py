@@ -79,7 +79,10 @@ class PlannerAgent:
             pass
         log_last_lm_call(caller="planner")
         logger.info("PlannerAgent DSPy response trace (last call):")
-        dspy.inspect_history(n=1)
+        try:
+            dspy.inspect_history(n=1)
+        except Exception:
+            pass
         log_lm_usage("planner", usage)
 
         try:

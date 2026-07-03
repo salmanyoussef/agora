@@ -253,7 +253,10 @@ def _rag_answer(
         logger.debug("RAG get_lm_usage not available: %s", e)
     log_last_lm_call(caller="general_rag")
     logger.info("GeneralAgent DSPy response trace (last call):")
-    dspy.inspect_history(n=1)
+    try:
+        dspy.inspect_history(n=1)
+    except Exception:
+        pass
     log_lm_usage("general_rag", usage)
     return pred.answer or "No answer could be produced from the given context.", usage
 
