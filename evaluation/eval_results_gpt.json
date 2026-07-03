@@ -1,0 +1,629 @@
+[
+  {
+    "id": "Q1",
+    "question": "Quels jeux de données sont disponibles sur la qualité de l'air en France ?",
+    "type": "discovery",
+    "domain": "environment",
+    "elapsed_s": 2109.3,
+    "subqueries": [
+      "Jeux de données mesures qualité de l'air stations France heures PM2.5 PM10 NO2 O3 Atmo France historique",
+      "Jeux de données réseaux capteurs air participatifs low-cost France Plume Labs capteurs citoyens mesures PM2.5 NO2 géolocalisation",
+      "Inventaire émissions polluants France jeux de données émissions secteur transport industrie agriculture CITEPA spatial temporel",
+      "Jeux de données prévisions et modèles qualité de l'air France grilles concentration CHIMERE PREV'AIR cartes horaires",
+      "Jeux de données indice ATMO qualité de l'air France quotidien par commune département historique",
+      "Jeux de données zones faibles émissions ZFE, seuils réglementaires qualité de l'air France géométries règles"
+    ],
+    "n_subqueries": 6,
+    "datasets_retrieved": 30,
+    "datasets_selected": 25,
+    "routing_counts": {
+      "rag": 16,
+      "technical": 9
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "5b4cbeabc751df5c2b5fae20",
+        "execution_mode": "rag",
+        "reasoning": "Concentrations horaires issues du réseau fixe en Île-de-France, incluant NO2, PM2.5, PM10 et O3 — correspond exactement à la demande de mesures horaires et historiques."
+      },
+      {
+        "dataset_id": "5b4cc322c751df5c2b5fae21",
+        "execution_mode": "rag",
+        "reasoning": "Concentrations mensuelles moyennes (sur un an glissant) pour NO2, PM2.5, PM10 et O3 en Île-de-France — utile pour séries temporelles et synthèses."
+      },
+      {
+        "dataset_id": "64e5850cde559bfdd00b3335",
+        "execution_mode": "rag",
+        "reasoning": "Concentrations moyennes annuelles (à partir de 2015) pour NO2, PM2.5, PM10 et O3 à l'échelle communale (Paris) — pertinent pour historique et comparaisons."
+      },
+      {
+        "dataset_id": "648a8d66d646693ab11c70c7",
+        "execution_mode": "rag",
+        "reasoning": "Concentrations moyennes annuelles (2004–2014) pour les mêmes polluants — apporte l'historique antérieur utile pour analyses temporelles."
+      },
+      {
+        "dataset_id": "648a8d56a919f95cc51c70c7",
+        "execution_mode": "rag",
+        "reasoning": "Émissions sectorielles de NOx, PM2.5 et PM10 — complémentaire aux concentrations pour identifier sources d'émission."
+      },
+      {
+        "dataset_id": "5f9691b1ffc619881d6b0bb1",
+        "execution_mode": "rag",
+        "reasoning": "Jeu AQMO : capteurs mobiles (bus) avec PM2.5/PM10, horodatage et coordonnées GPS — pertinent pour capteurs mobiles/participatifs; un échantillon suffit pour confirmer les champs disponibles."
+      },
+      {
+        "dataset_id": "658062cf96421d3c20a672b4",
+        "execution_mode": "rag",
+        "reasoning": "Jeu Côtes d'Armor (relevé journalier) : initiative inspirée de Sensor Community (capteurs citoyens low-cost) avec mesures air/temp/hygrométrie — utile pour capteurs participatifs; un échantillon donne un aperçu des variables et couverture."
+      },
+      {
+        "dataset_id": "658011abd7bcebb927876796",
+        "execution_mode": "rag",
+        "reasoning": "Jeu Côtes d'Armor (relevé horaire) : version horaire du même réseau de capteurs citoyens (plus granulaire) — pertinent pour analyses locales temporelles; un extrait aléatoire suffit pour la description."
+      },
+      {
+        "dataset_id": "6729ea0c4fc557c93d0c8cec",
+        "execution_mode": "rag",
+        "reasoning": "Jeu de données Atmo France sur les émissions de polluants de l'air et GES à l'échelle régionale et EPCI : inventaire spatial et temporel pertinent pour repérer données par territoire."
+      },
+      {
+        "dataset_id": "6931f06c3a3cc103dae27465",
+        "execution_mode": "rag",
+        "reasoning": "Jeu 'Émissions de gaz à effet de serre annuelles par secteur' : fournit un découpage annuel par secteurs (transport, industrie, agriculture), utile pour l'inventaire sectoriel (CITEPA/annuel)."
+      },
+      {
+        "dataset_id": "5e95961ad1d83ca488026f2d",
+        "execution_mode": "rag",
+        "reasoning": "Inventaire territorialisé des GES (mission CITEPA) avec résolution communale et possibilité d'agrégation EPCI/région — correspond exactement à la demande spatiale et temporelle."
+      },
+      {
+        "dataset_id": "67f79b112ceb5b1df4c25a8b",
+        "execution_mode": "technical",
+        "reasoning": "Jeu PREV'AIR explicitement intitulé «Prévisions» (J+5) — pertinent pour obtenir détails sur grilles horaires, polluants et modèle utilisé (nécessite recherche dans la description/métadonnées)."
+      },
+      {
+        "dataset_id": "67f8c966c92603a7a776f4f1",
+        "execution_mode": "technical",
+        "reasoning": "Jeu PREV'AIR «Analyses» — fournit les produits d'analyse (J-1) basés sur modélisation+observations ; utile pour cartes horaires et méthodologie (requiert recherche ciblée)."
+      },
+      {
+        "dataset_id": "588a011288ee38066d9b81a4",
+        "execution_mode": "technical",
+        "reasoning": "Mise à disposition PREV'AIR (mention J+3) — pertinent pour connaître l'étendue temporelle et les formats (grilles de concentration, cartes horaires) : recherche nécessaire."
+      },
+      {
+        "dataset_id": "588a025a88ee3808a59b81a4",
+        "execution_mode": "technical",
+        "reasoning": "Autre distribution PREV'AIR (mention J+2, polluants O3/PM10) — utile pour vérifier quels polluants et horizons sont publiés et si CHIMERE/grilles horaires sont fournies (requiert extraction ciblée)."
+      },
+      {
+        "dataset_id": "6149925a2ff0ab6cebdd6fe8",
+        "execution_mode": "rag",
+        "reasoning": "Jeu national 'Indice de la qualité de l'air quotidien par commune - indice ATMO' (Atmo France) qui fournit l'indice ATMO quotidien par commune et un historique (flux CSV/WFS) — correspond exactement à la requête."
+      },
+      {
+        "dataset_id": "6729ed3a87591d8ff72ab95c",
+        "execution_mode": "rag",
+        "reasoning": "Plateforme Atmo Data qui centralise les flux nationaux (dont l'indice ATMO) — utile pour accéder aux flux agrégés et à la couverture nationale."
+      },
+      {
+        "dataset_id": "648a8d5723958b47eb1c70c7",
+        "execution_mode": "rag",
+        "reasoning": "Jeu 'Indice ATMO à partir de 2021' (Ville de Paris) : pertinent si vous cherchez des données par commune/département pour Paris et la période post-2021 (nouvel indice)."
+      },
+      {
+        "dataset_id": "648d3089bb426985e31c70c7",
+        "execution_mode": "rag",
+        "reasoning": "Jeu CITEAIR jusqu'à 2020 : pertinent pour reconstituer l'historique avant la révision de l'indice ATMO en 2021 (complément historique)."
+      },
+      {
+        "dataset_id": "665915642d1ccfca0e7c6364",
+        "execution_mode": "rag",
+        "reasoning": "Table des codes couleur et libellés de l'indice ATMO : nécessaire pour interpréter les valeurs d'indice dans les jeux de données."
+      },
+      {
+        "dataset_id": "625438b890bf88454b283a55",
+        "execution_mode": "technical",
+        "reasoning": "Base nationale consolidée des ZFE : agrégat national conforme au schéma ZFE — utile pour obtenir la liste complète des ZFE, métadonnées, schéma commun et règles au niveau national."
+      },
+      {
+        "dataset_id": "67da414e265e67dae3d60621",
+        "execution_mode": "technical",
+        "reasoning": "ZFE Angers Loire Métropole : contient le zonage, géométries et règles locales (schéma national) — à rechercher pour extraire périmètre et conditions d'accès."
+      },
+      {
+        "dataset_id": "684c4c5d45e1b1cfad52b6ba",
+        "execution_mode": "technical",
+        "reasoning": "ZFE Auvergne-Rhône-Alpes : jeu régional décrivant périmètres, critères Crit'Air et périodes d'application — nécessite recherche pour obtenir détails géométriques et règles par commune."
+      },
+      {
+        "dataset_id": "689d764a1f90bdfb1325239f",
+        "execution_mode": "technical",
+        "reasoning": "ZFE Provence-Alpes-Côte d'Azur : couvre zonages régionaux et modalités d'application — utile pour récupérer géométries et dispositions réglementaires locales."
+      },
+      {
+        "dataset_id": "624b870b74ce42d92f58fff3",
+        "execution_mode": "technical",
+        "reasoning": "ZFE-m Voies exceptionnelles (Strasbourg) : précise voies soumises à règles distinctes/exceptionnelles — nécessaire pour extraire géométries et règles particulières."
+      }
+    ],
+    "answer": "Voici les principaux jeux de données disponibles (exemples fournis par la recherche fournie) classés par type, avec une brève description et les limites observées. Cette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).\n\n1) Réseaux officiels de mesures (stations fixes)\n- [Concentrations horaires de polluants dans l'air ambiant — Airparif (Île‑de‑France)](https://www.data.gouv.fr/datasets/concentrations-horaires-de-polluants-dans-lair-ambiant-issues-du-reseau-permanent-de-mesures-automatiques-en-region-ile-de-france)  \n  Contenu : moyennes horaires pour SO2, NO, NO2, PM10, PM2.5, O3, benzène, CO ; méthodes conformes aux directives européennes. Limite : couverture régionale (Île‑de‑France) dans le fichier cité.\n- [Concentrations mensuelles moyennes — Airparif (Île‑de‑France)](https://www.data.gouv.fr/datasets/concentrations-mensuelles-moyennes-de-polluants-dans-lair-ambiant-issues-du-reseau-permanent-de-mesures-en-region-ile-de-france-sur-un-an-glissant)  \n  Contenu : moyennes mensuelles « sur un an glissant » pour mêmes polluants. Limite : régional, format WFS/GeoJSON documenté.\n- Jeux de la Ville de Paris (moyennes annuelles et indices) :\n  - [Qualité de l'air – Concentration moyenne (NO2, PM2.5, PM10, O3) à partir de 2015 — Ville de Paris](https://www.data.gouv.fr/datasets/qualite-de-lair-concentration-moyenne-no2-pm2-5-pm10-o3-a-partir-de-2015)  \n    Contenu : séries annuelles 2015→ (ventilation par type de site : fond urbain, proximité trafic, etc.). Limite : données agrégées annuelles pour Paris.\n  - [Qualité de l'air – Concentration moyenne (2004–2014) — Ville de Paris](https://www.data.gouv.fr/datasets/qualite-de-lair-concentration-moyenne-no2-pm2-5-pm10-o3)  \n    Contenu : historiques annuels (2004–2014) pour Paris.\n\nRemarque : la recherche fournie ne comprenait pas un exemplaire exhaustif d’un jeu national horaire station‑par‑station publié directement ici — pour les flux nationaux, voir la plateforme Atmo Data (cf. ci‑dessous).\n\n2) Plateforme nationale / indices quotidiens (couverture nationale)\n- [Atmo Data — la plateforme nationale des flux open data des AASQA (Atmo France)](https://www.data.gouv.fr/datasets/atmo-data-la-plateforme-nationale-des-flux-open-data-des-associations-agreees-de-surveillance-de-la-qualite-de-lair)  \n  Contenu : flux nationaux (indices ATMO, inventaires d'émissions par territoire, WFS/CSV/API REST). Supporte extraction par échelle (région/EPCI/département). Limite : la notice indique couverture n et n‑1 ; pour schéma complet et séries horaires il faut interroger l'API/flux.\n- [Indice de la qualité de l'air quotidien par commune – indice ATMO (Atmo France)](https://www.data.gouv.fr/datasets/indice-de-la-qualite-de-lair-quotidien-par-commune-indice-atmo)  \n  Contenu : indice ATMO journalier par zone (commune/EPCI), champs (date, code_qual, lib_qual, couleur, géométrie). Limite : notice signale couverture « année civile en cours et année précédente » ; historique multi‑années complet non confirmé dans l'extrait.\n\n3) Prévisions et produits de modélisation (grilles, NetCDF)\n- [PREV'AIR – prévisions / analyses (exemples NetCDF)](https://www.data.gouv.fr/datasets/prevair-previsions-de-la-qualite-de-lair-pour-la-france-air-quality-forecasts-for-france) et [PREV'AIR – analyses](https://www.data.gouv.fr/datasets/prevair-analyses-de-la-qualite-de-lair-pour-la-france-air-quality-analysis-for-france)  \n  Contenu (extraits fournis) : produits modèles CHIMERE (analyses et prévisions jusqu'à J+5) fournis en NetCDF CF, grilles latitude/longitude horaires (ex. PM10_composite, PM25_composite en µg/m3). Limite : certains fichiers sont agrégés (ex. MAXJ = maximum journalier) ; pour obtenir horaires bruts prendre les sorties horaires PREV'AIR correspondantes.\n\n4) Inventaires et émissions (pour attribution des sources)\n- [Données émissions à l'échelle région / EPCI — Atmo France (Atmo Data)](https://www.data.gouv.fr/datasets/donnees-emissions-a-lechelle-de-la-region-et-de-letablissement-public-de-cooperation-intercommunale-epci)  \n  Contenu : émissions annuelles (NOx, PM10, PM2.5, GES) par territoire et par secteur (format PCAET), accessible via API/WFS.\n- [Émissions de gaz à effet de serre annuelles par secteur (Ecolab / extrait CITEPA)](https://www.data.gouv.fr/datasets/emissions-de-gaz-a-effet-de-serre-annuelles-par-secteur)  \n  Contenu : inventaire national/territorialisé par secteur (résolution annuelle, communes/régions).\n- [Inventaire de gaz à effet de serre territorialisé — ADEME / CITEPA](https://www.data.gouv.fr/datasets/inventaire-de-gaz-a-effet-de-serre-territorialise)  \n  Contenu : territorialisation communale des émissions de GES (utiles pour modélisation/exposition).\n- [Qualité de l'air – Emissions sectorielles (Ville de Paris)](https://www.data.gouv.fr/datasets/qualite-de-lair-emissions-sectorielles-de-nox-pm2-5-pm10)  \n  Contenu : bilans annuels des émissions par secteur pour Paris.\n\n5) Capteurs citoyens / réseaux low‑cost et mesures mobiles\n- [Qualité de l'air, température et hygrométrie – relevé horaire (Département des Côtes d'Armor)](https://www.data.gouv.fr/datasets/qualite-de-lair-temperature-et-hygrometrie-releve-horaire) et [relevé journalier](https://www.data.gouv.fr/datasets/qualite-de-lair-temperature-et-hygrometrie-releve-journalier)  \n  Contenu : capteurs citoyens (Sensor Community style) mesurant PM2.5 et PM10, température, humidité ; versions horaire et journalière disponibles (ex. début 2023). Limite : pas de confirmation dans l'extrait de mesures NO2 ni d'intégration Plume Labs.\n- [Mesures des niveaux de particules fines par capteurs mobiles (AQMO_SV) — IRISA / UMR ... (jeu mentionné)](https://www.data.gouv.fr/datasets/mesures-des-niveaux-de-particules-fines-par-capteurs-mobiles)  \n  Contenu attendu : mesures mobiles (bus), PM2.5/PM10 avec géolocalisation. Limite : téléchargement/extraction échoué dans l'extrait fourni — champs exacts non vérifiés ici.\n\n6) Indices historiques et agrégats (ville / période antérieure)\n- [Qualité de l'air – Indice ATMO à partir de 2021 (Ville de Paris)](https://www.data.gouv.fr/datasets/qualite-de-lair-indice-atmo-a-partir-de-2021) et [Indice CITEAIR jusqu'à 2020 (Ville de Paris)](https://www.data.gouv.fr/datasets/qualite-de-lair-indice-citeair-jusqua-2020)  \n  Contenu : agrégats annuels de jours par catégorie (utile pour tendances à l'échelle de Paris). Limite : jeux municipaux / agrégats (pas séries quotidiennes par commune nationale).\n\n7) Données réglementaires et géographiques utiles pour politiques locales (ZFE)\n- [Base nationale consolidée des Zones à Faibles Émissions (ZFE) — Point d'Accès National / transport.data.gouv.fr](https://www.data.gouv.fr/datasets/base-nationale-consolidee-des-zones-a-faibles-emissions)  \n  Contenu : GeoJSON / WFS des périmètres ZFE, règles Crit'Air par catégorie, horaires, dates d'application, liens vers arrêtés. Permet croisement spatial avec concentrations/modèles.\n- Exemples régionaux / locaux (GeoJSON / WFS) :\n  - [Zone à Faibles Emissions (ZFE) — Angers Loire Métropole](https://www.data.gouv.fr/datasets/zone-a-faibles-emissions-zfe-angers-loire-metropole)  \n  - [Zones à Faibles Émissions (ZFE) en Auvergne-Rhône-Alpes (DREAL)](https://www.data.gouv.fr/datasets/zones-a-faibles-emissions-zfe-en-auvergne-rhone-alpes)  \n  - [Zones à faibles émissions (ZFE) en Provence‑Alpes‑Côte d'Azur (DREAL PACA)](https://www.data.gouv.fr/datasets/zones-a-faibles-emissions-zfe-en-provence-alpes-cote-dazur-1)  \n  - Exemple de couches de voies exceptionnelles : [ZFE‑m — Eurométropole de Strasbourg (zfe_voie_exception.geojson)](https://www.data.gouv.fr/datasets/zfe-m-voies-exceptionnelles)  \n  Contenu : géométries, seuils Crit'Air par type de véhicule, dates/horaires, liens réglementaires.\n\nPoints importants / limites observées dans les extraits fournis\n- Couverture nationale horaire station‑par‑station : la plateforme Atmo Data est la source nationale recommandée (indices, émissions, flux open data). Les extraits fournis montrent l'existence d'APIs/WFS mais le contexte ne fournissait pas un unique fichier national horaire station‑par‑station complet ; pour obtenir séries horaires historiques par station il faut interroger l'API Atmo Data ou les AASQA locales (cf. [Atmo Data](https://www.data.gouv.fr/datasets/atmo-data-la-plateforme-nationale-des-flux-open-data-des-associations-agreees-de-surveillance-de-la-qualite-de-lair)).\n- Produits PREV'AIR : disponibles en NetCDF (grilles CHIMERE) — les extraits montrent fichiers horaires et agrégats (MAXJ). Vérifier dans chaque fichier si la variable est horaire ou agrégée (métadonnées cell_methods). Exemples fournis dans les ressources PREV'AIR citées ci‑dessus.\n- Capteurs mobiles / participatifs : présents (ex. Côtes d'Armor, AQMO) mais certains fichiers n'ont pas pu être extraits dans l'échantillon fourni — il faut télécharger la ressource complète pour confirmer schémas et géolocalisation.\n- ZFE : base nationale consolidée disponible en GeoJSON/WFS avec règles et géométries, utile pour analyses d'exposition et de politiques locales.\n\nSi vous souhaitez un inventaire ciblé (par ex. tous les jeux contenant séries horaires de PM2.5 pour la France entière, ou tous les NetCDF PREV'AIR disponibles), les métadonnées listées ci‑dessus montrent quelles sources consulter (Atmo Data, PREV'AIR, AASQA régionales comme Airparif, portails municipaux). Les URLs listées ici renvoient aux jeux cités dans le résumé fourni par la pipeline.\n\nCette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).",
+    "total_tokens": 0,
+    "cost_usd": "0.17339824"
+  },
+  {
+    "id": "Q2",
+    "question": "Quelles données sur les accidents de la route en France sont disponibles sur data.gouv.fr ?",
+    "type": "discovery",
+    "domain": "transport",
+    "elapsed_s": 3240.4,
+    "subqueries": [
+      "Base accidents corporels de la circulation BAAC géolocalisé CSV GeoJSON 'accidents corporels' 'BAAC' latitude longitude année 2005..2024 gravité blessés morts véhicules impliqués",
+      "Statistiques accidents routiers bilan annuel 'mortalité routière' 'nombre de décès' par département commune CSV tableau 'annuel' 'par département'",
+      "Accidents impliquant piétons cyclistes deux-roues 'usagers vulnérables' CSV 'piéton' 'cycliste' 'motocyclette' blessures décès",
+      "Localisation radars fixes radars-tronçon GeoJSON 'radar' 'localisation' 'contrôle vitesse' CSV",
+      "Comptages de trafic AADT 'comptage' 'intensité' trafic par tronçon route CSV GeoJSON 'parcours' 'tronçon' 'AADT'",
+      "Circonstances accidents alcool vitesse météo 'cause' 'circonstances' 'alcoolémie' 'condition météo' CSV 'type de collision'"
+    ],
+    "n_subqueries": 6,
+    "datasets_retrieved": 18,
+    "datasets_selected": 14,
+    "routing_counts": {
+      "technical": 7,
+      "rag": 7
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "53698f4ca3a729239d2036df",
+        "execution_mode": "technical",
+        "reasoning": "Jeu national BAAC (2005-2024) du Ministère de l'Intérieur — nécessaire de rechercher/valider précisément les années, la présence de coordonnées (latitude/longitude), les formats (CSV/GeoJSON) et les champs (gravité, blessés, morts, véhicules impliqués)."
+      },
+      {
+        "dataset_id": "64ffd45c425da93b05ae9bff",
+        "execution_mode": "rag",
+        "reasoning": "Couche locale géolocalisée (Rennes Métropole) — un échantillon aléatoire suffit pour confirmer la structure GeoJSON/CSV et la présence de variables liées aux accidents corporels."
+      },
+      {
+        "dataset_id": "5cddfdd506e3e7152e835f9e",
+        "execution_mode": "rag",
+        "reasoning": "Jeu 2015 (Commune de Brocas) — exemple ponctuel disponible sur data.gouv.fr ; un échantillon suffit pour voir les champs et le format au niveau communal."
+      },
+      {
+        "dataset_id": "53698f4ca3a729239d2036df",
+        "execution_mode": "technical",
+        "reasoning": "Base nationale annuelle (2005–2024) du Ministère de l'Intérieur — contient les enregistrements et/ou tableaux permettant de rechercher et calculer le nombre de décès annuels par département et commune (requiert extraction/aggrégation)."
+      },
+      {
+        "dataset_id": "6662501aa070d9b3ee9fc8f3",
+        "execution_mode": "rag",
+        "reasoning": "Tableau de bord départemental Seine‑Maritime 2021 — exemple annuel/locale en format tableau/CSV ; un échantillon suffit pour voir la structure des données publiées."
+      },
+      {
+        "dataset_id": "58d49a4ba3a7293affeffb39",
+        "execution_mode": "rag",
+        "reasoning": "Jeu de données des accidents corporels (Hauts‑de‑Seine) — exemple départemental montrant les fiches/attributs disponibles ; un extrait aléatoire suffit pour illustrer le contenu."
+      },
+      {
+        "dataset_id": "5cade7dd8b4c4101d71b0532",
+        "execution_mode": "technical",
+        "reasoning": "Bilan 2017 géolocalisé des radars : utile pour obtenir géolocalisation + comptages (chercheurs de ressources GeoJSON/CSV et colonnes de localisation/vitesse)."
+      },
+      {
+        "dataset_id": "5b3f9369c751df4bbdb0a1ea",
+        "execution_mode": "technical",
+        "reasoning": "Jeu principal 'Radars automatiques' couvrant ~3000 radars (type, position, direction, vitesse contrôlée) ; nécessite recherche des ressources (GeoJSON/CSV) et filtrage par type 'fixe'/'tronçon'."
+      },
+      {
+        "dataset_id": "673775a0831ee9d824c40c0e",
+        "execution_mode": "technical",
+        "reasoning": "Couche régionale 'Radars fixes (tronçons) en Côte-d'Or' avec localisation X/Y et tronçon : pertinent pour obtenir un GeoJSON/CSV local et vérifier structure des coordonnées et attributs."
+      },
+      {
+        "dataset_id": "6480956dee39c6b7774817bd",
+        "execution_mode": "rag",
+        "reasoning": "Trafic par tronçon (lignes) avec mesures de vitesses et comptages par tronçon — utile pour AADT/intensité et compatible Geo/INSPIRE. Un échantillon/métadonnée suffit pour valider les champs et formats."
+      },
+      {
+        "dataset_id": "63927ba8c5f57e67f6a1833f",
+        "execution_mode": "rag",
+        "reasoning": "Points de comptage (Loiret 2021) avec indicateurs annuels de trafic (TMJA/AADT, part poids-lourds) et géolocalisation — pertinent pour obtenir TMJA en CSV/GeoJSON; un extrait confirme les champs."
+      },
+      {
+        "dataset_id": "673690dca36565cf33c40aa7",
+        "execution_mode": "rag",
+        "reasoning": "Points de comptage (Loiret 2023) équivalent au jeu 2021 mais actualisé — contient TMJA/AADT et géométrie; un échantillon permet de vérifier la structuration des données."
+      },
+      {
+        "dataset_id": "5cddfdd506e3e7152e835f9e",
+        "execution_mode": "technical",
+        "reasoning": "Jeu 'MOBILITE-Accidents_corporels_circulation_2015' : fiche d'accident corporel qui devrait contenir des champs 'circonstances', 'cause', 'alcoolémie', 'condition météo' et 'type de collision' — il faut rechercher les noms de colonnes et valeurs précises."
+      },
+      {
+        "dataset_id": "5d56becc8b4c412584b830c9",
+        "execution_mode": "technical",
+        "reasoning": "Jeu 'Accidents de vélo' (extrait de la base nationale) : contient les enregistrements d'accidents avec victimes à vélo et probablement les mêmes champs circonstanciels (alcool, météo, type de collision) — nécessite recherche des colonnes et vérification du format CSV."
+      }
+    ],
+    "answer": "Voici ce qui est disponible sur data.gouv.fr (synthèse et limites), avec les jeux de données cités et leurs URL :\n\n1) Base nationale BAAC (accidents corporels) — tables annuelles (2005–2024)\n- Contenu principal : base nationale d'accidents corporels fournie par le Ministère de l'Intérieur, distribuée par année et organisée en plusieurs fichiers (ex. lieux, caract, usagers, vehicules). Permet une analyse au niveau incident (Num_Acc) et agrégation par année/département/commune.\n- Attributs disponibles (d'après la fiche / aperçu) : identifiant d'accident (Num_Acc), champs de localisation (fichier \"lieux\" — géolocalisation signalée dans le resource_context), nombre de véhicules (nbv), et de nombreuses variables décrivant la route, situation et conditions (atm, lum, surf, catr, choc, etc.). Les informations sur gravité / blessés / décès se trouvent soit dans d'autres fichiers annuels (usagers, caract) à joindre via Num_Acc, soit dans champs de gravité présents dans certaines extractions départementales.\n- Limite constatée : l'aperçu fourni au pipeline ne montrait pas toujours explicitement les colonnes latitude/longitude (noms exacts) ; il confirme Num_Acc et nbv et indique couverture 2005–2024, mais pour garantir l'existence et le nom exact des colonnes géographiques et la présence systématique des champs \"décès / nb_blessés\" il faut télécharger les CSV/GeoJSON complets et joindre les fichiers par Num_Acc.\n- Source : Bases de données annuelles des accidents corporels de la circulation routière - Années de 2005 à 2024 (Ministère de l'intérieur) : https://www.data.gouv.fr/datasets/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024\n\n2) Jeux locaux / départementaux / communaux (exemples)\n- Rennes Métropole — jeu d'accidents corporels disponible en CSV/GeoJSON : contient géométrie (geo_point_2d / geo_shape), identifiants, date/heure, adresse, code INSEE, champs vehicule/usager et indicateurs liés aux blessures (ntu, nbh, nbnh) visibles dans l'aperçu. Utile pour cartographie et analyses locales.\n  - Source : Accidents corporels sur Rennes Métropole : https://www.data.gouv.fr/datasets/accidents-corporels-sur-rennes-metropole\n- Commune de Brocas (ex. 2015) — jeu communal avec num_acc, date/heure, commune, année et formats shp/csv/geojson selon fiche.\n  - Source : MOBILITE-Accidents_corporels_circulation_2015 (Brocas) : https://www.data.gouv.fr/datasets/mobilite-accidents-corporels-circulation-2015\n- Hauts‑de‑Seine — jeu départemental contenant fiches d'accident avec date/heure, commune, coordonnées, conditions (météo, état chaussée), type de collision, description des véhicules et gravité des victimes (ex. \"Blessé léger\", \"Blessé grave\", etc.).\n  - Source : Accidents corporels de la circulation routière (Hauts‑de‑Seine) : https://www.data.gouv.fr/datasets/accidents-corporels-de-la-circulation-routiere\n- Seine‑Maritime — tableau de bord départemental (2021) : fiche et tableau indicateurs (extraction de la page de l'open data départemental).\n  - Source : Tableau de bord Accidents de la route en Seine‑Maritime en 2021 : https://www.data.gouv.fr/datasets/tableau-de-bord-accidents-de-la-route-en-seine-maritime-en-2021\n\n3) Jeux dédiés — usagers vulnérables, vélo\n- Accidents de vélo (jeu Koumoul) : dataset centré sur les accidents impliquant des vélos, utile pour études spécifiques sur cyclistes.\n  - Source : Accidents de vélo (Koumoul) : https://www.data.gouv.fr/datasets/accidents-de-velo\n\n4) Radars (localisation et bilans) — fixes et tronçons\n- Plusieurs ressources de radars automatiques et bilans géolocalisés existent (géométries ponctuelles ou tronçons). Ces jeux permettent de croiser localisation des contrôles de vitesse avec accidents.\n  - Exemples fournis :\n    - Radars automatiques : bilan 2017 géolocalisé : https://www.data.gouv.fr/datasets/radars-automatiques-bilan-2017-geolocalise\n    - Radars automatiques (fichier général) : https://www.data.gouv.fr/datasets/radars-automatiques\n    - Radars fixes (tronçons) en Côte‑d'Or (DDT Côte‑d'Or) : https://www.data.gouv.fr/datasets/radars-fixes-troncons-en-cote-dor\n- Limite constatée : certaines ressources contiennent un bilan tabulaire sans coordonnées et un GeoJSON/shapefile séparé (il faut joindre par identifiant pour obtenir lon/lat). Le pipeline a préparé des scripts de jointure, mais l'extraction automatique a échoué dans l'environnement courant.\n\n5) Comptages de trafic (exposition / TMJA / AADT)\n- Jeux de comptage routier par point/tronçon (TMJA / trafic moyen annuel) existent au niveau métropole ou département (ex. Brest métropole, Département du Loiret 2021 et 2023). Ces fichiers ont géométrie/tronçon et champs d'intensité (TMJO/TMJA), part poids-lourds, dates de campagne.\n  - Sources :\n    - Trafic routier : résultats de mesure et comptage (Brest métropole) : https://www.data.gouv.fr/datasets/trafic-routier-resultats-de-mesure-et-comptage\n    - Trafic routier - Points de comptage - Département du Loiret - 2021 : https://www.data.gouv.fr/datasets/trafic-routier-points-de-comptage-departement-du-loiret-2021\n    - Trafic routier - Points de comptage - Département du Loiret - 2023 : https://www.data.gouv.fr/datasets/trafic-routier-points-de-comptage-departement-du-loiret-2023\n- Limite constatée : les extraits fournis n'incluaient pas de CSV/GeoJSON lisible (WFS/ZIP ont timeout ou n'ont pas été extraits). La fiche confirme la présence de TMJA/TMJO et géolocalisation, mais il faut récupérer les fichiers complets pour analyses.\n\n6) Variables “circonstances / causes / météo / alcool / vitesse”\n- Ce que l’on trouve couramment dans les jeux BAAC et fiches départementales :\n  - météo / conditions lumineuses / état de la chaussée : champs du type atm, lum, surf (présents dans les aperçus).\n  - type de collision / catégorie de la voie / manœuvre : catr, choc, manv, typevehicules, etc.\n  - champs texte d'observation (obs / obsm) qui peuvent contenir mentions d'alcool ou détails non codés.\n- Limitations : dans les aperçus fournis il n'y a pas toujours une colonne explicite nommée \"alcool\" ou \"vitesse\". L'information sur alcoolémie est souvent soit codée dans un champ spécifique s'il existe, soit mentionnée dans les champs d'observation libre. Pour analyser alcool/vitesse il faudra inspecter les fichiers complets et/ou faire une extraction textuelle des champs d'observation.\n- Preuves / exemples : colonnes atm, choc, catr, obs apparaissent dans le schéma aperçu du BAAC (voir la fiche nationale) et les jeux départementaux montrent gravité/description des victimes (Hauts‑de‑Seine).\n\n7) Que faut‑il faire pour obtenir exactement les variables / faire les jonctions utiles\n- Pour analyses fines (cartographie et comptage de décès/blessés) : télécharger les fichiers BAAC annuels complets (lieux.csv, usagers.csv, caract.csv, vehicules.csv) et joindre par Num_Acc pour obtenir géométrie + nombre/gravité des victimes. (Voir la fiche nationale BAAC : https://www.data.gouv.fr/datasets/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024)\n- Pour croiser contrôles radar et accidents : récupérer le GeoJSON/shapefile de radars (si disponible) et joindre aux bilans radars par identifiant ; joindre spatialement aux accidents géolocalisés si les coordonnées sont présentes.\n- Pour normaliser par exposition : télécharger les jeux de comptage (TMJA/TMJO) par tronçon et joindre spatialement/ID‑tronçon aux accidents.\n\n8) Notes finales sur l’état des extractions fournies par le pipeline\n- Le pipeline AGORA a identifié et préparé scripts pour joindre/convertir et vérifier les colonnes (ex. détecter lat/lon, extraire année depuis Num_Acc, repérer mentions d'alcool dans obs), mais plusieurs extractions automatiques ont échoué dans l'environnement (erreur d'exécution / timeouts) ; par conséquent certaines confirmations (noms exacts de colonnes lat/long dans chaque fichier, présence systématique d'un champ \"décès\" explicite) n'ont pu être vérifiées sans télécharger les fichiers complets.\n- Si vous voulez la liste exhaustive complète des fichiers et leurs schémas pour un ou plusieurs jeux précis, il faut télécharger les CSV/GeoJSON/shapefiles indiqués sur les fiches ci‑dessus et consulter leur en‑tête / métadonnées (les URL sont fournies plus haut).\n\nCette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr). Les principales fiches consultées et citées ci‑dessus sont :\n- Bases de données annuelles des accidents corporels (2005–2024) : https://www.data.gouv.fr/datasets/bases-de-donnees-annuelles-des-accidents-corporels-de-la-circulation-routiere-annees-de-2005-a-2024\n- Accidents corporels sur Rennes Métropole : https://www.data.gouv.fr/datasets/accidents-corporels-sur-rennes-metropole\n- MOBILITE-Accidents_corporels_circulation_2015 (Brocas) : https://www.data.gouv.fr/datasets/mobilite-accidents-corporels-circulation-2015\n- Accidents corporels de la circulation routière (Hauts‑de‑Seine) : https://www.data.gouv.fr/datasets/accidents-corporels-de-la-circulation-routiere\n- Tableau de bord Accidents de la route en Seine‑Maritime en 2021 : https://www.data.gouv.fr/datasets/tableau-de-bord-accidents-de-la-route-en-seine-maritime-en-2021\n- Radars automatiques : https://www.data.gouv.fr/datasets/radars-automatiques-bilan-2017-geolocalise and https://www.data.gouv.fr/datasets/radars-automatiques\n- Radars fixes (tronçons) en Côte‑d'Or : https://www.data.gouv.fr/datasets/radars-fixes-troncons-en-cote-dor\n- Trafic / comptages (Brest, Loiret) : https://www.data.gouv.fr/datasets/trafic-routier-resultats-de-mesure-et-comptage and https://www.data.gouv.fr/datasets/trafic-routier-points-de-comptage-departement-du-loiret-2021 and https://www.data.gouv.fr/datasets/trafic-routier-points-de-comptage-departement-du-loiret-2023\n- Accidents de vélo (Koumoul) : https://www.data.gouv.fr/datasets/accidents-de-velo\n\nSi vous souhaitez, utilisez directement ces fiches pour télécharger les CSV/GeoJSON/shapefiles complets (chacune contient les ressources téléchargeables et la notice) : les fichiers complets permettront de confirmer les noms exacts des colonnes, le taux de complétude des coordonnées, et de produire les jointures/agrégats (par Num_Acc, par département, par année) nécessaires aux analyses.",
+    "total_tokens": 0,
+    "cost_usd": "0.93241647"
+  },
+  {
+    "id": "Q3",
+    "question": "Combien de stations de vélos en libre-service existe-t-il à Paris ?",
+    "type": "analytical",
+    "domain": "transport",
+    "elapsed_s": 729.8,
+    "subqueries": [
+      "Liste des stations Vélib' (Vélib Métropole) à Paris — fichier ou API listant toutes les stations avec identifiant, nom et coordonnées (snapshot / catalogue de stations) — sources: data.gouv.fr, opendata.paris.fr, JCDecaux"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 3,
+    "datasets_selected": 2,
+    "routing_counts": {
+      "technical": 2
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "5a55bcafa3a7292ec217f21f",
+        "execution_mode": "technical",
+        "reasoning": "Catalogue officiel des stations (localisation et caractéristiques) publié par la Ville de Paris : contient l'identifiant, le nom et les coordonnées nécessaires; il faut filtrer/comptabiliser les stations situées dans Paris => nécessite recherche/agrégation."
+      },
+      {
+        "dataset_id": "53c2740ba3a7292df9d31973",
+        "execution_mode": "technical",
+        "reasoning": "Flux de disponibilités en temps réel qui contient aussi l'inventaire des stations avec identifiants et coordonnées; utile pour croiser/vérifier le nombre de stations actif actuellement => nécessite recherche/filtre et comptage."
+      }
+    ],
+    "answer": "Selon les jeux de données analysés sur le portail des données ouvertes françaises, il y a 1 517 stations de vélos en libre-service à Paris dans le snapshot fourni.\n\nSources :\n- Vélib' - Localisation et caractéristique des stations : https://www.data.gouv.fr/datasets/velib-localisation-et-caracteristique-des-stations (aperçu contenant 1 517 enregistrements ; note : l'export analysé contenait fréquemment la latitude mais pas toujours la longitude) ;\n- Stations Vélib - Disponibilités en temps réel : https://www.data.gouv.fr/datasets/stations-velib-disponibilites-en-temps-reel-prs (snapshot contenant 1 517 lignes, une par station).\n\nCette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).",
+    "total_tokens": 0,
+    "cost_usd": "0.27631397"
+  },
+  {
+    "id": "Q4",
+    "question": "Quels sont les jeux de données disponibles sur le budget des communes françaises ?",
+    "type": "discovery",
+    "domain": "finance",
+    "elapsed_s": 2984.9,
+    "subqueries": [
+      "budget des communes jeu de données budget primitif compte administratif dépenses recettes par commune année",
+      "dépenses par nature par commune dépenses par fonction par commune jeu de données",
+      "recettes fiscales locales taxes locales dotation globale fonctionnement DGFIP DGCL jeu de données communes",
+      "séries temporelles finances locales communes historique budgets 2010 2015 2020 2024 jeu de données",
+      "DGCL DGFIP INSEE identifiant code commune jeu de données finances locales clés de jointure"
+    ],
+    "n_subqueries": 5,
+    "datasets_retrieved": 15,
+    "datasets_selected": 13,
+    "routing_counts": {
+      "rag": 8,
+      "technical": 5
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "66feb367978e150450436d99",
+        "execution_mode": "rag",
+        "reasoning": "Jeu de données 'Budget Primitif 2019' de la Ville de Lanester : concerne explicitement le budget primitif communal (dépenses/recettes, fonctionnement/investissement), donc pertinent pour l'inventaire demandé. Un échantillon suffit pour extraire titre, description et nature des données."
+      },
+      {
+        "dataset_id": "5cb99b0b634f41498bf6e9d8",
+        "execution_mode": "rag",
+        "reasoning": "Jeu 'Budgets primitifs' de la Commune de Saint‑Paul‑lès‑Dax : contient budgets primitifs municipaux (dépenses/recettes par chapitres/articles) — directement pertinent. Un extrait des métadonnées permet de confirmer années et périmètre."
+      },
+      {
+        "dataset_id": "55194b6cc751df5025057c91",
+        "execution_mode": "rag",
+        "reasoning": "Contient des dépenses de fonctionnement classées par type (dépenses par nature) pour une commune (Issy-les-Moulineaux) : un échantillon suffit pour voir la structure et les libellés."
+      },
+      {
+        "dataset_id": "62da21021d3f7025e69ef260",
+        "execution_mode": "rag",
+        "reasoning": "Dépenses culturelles par commune (montants, euros/habitant, pourcentage) : pertinent pour la notion de dépenses par fonction (culture) ; un extrait montre les variables disponibles."
+      },
+      {
+        "dataset_id": "595b1f22a3a7291dd09c855a",
+        "execution_mode": "rag",
+        "reasoning": "Budgets votés (M14-M52) avec sections fonctionnement/investissement pour la collectivité parisienne : illustre la classification budgétaire et les postes de dépenses ; un échantillon suffit pour vérifier le format."
+      },
+      {
+        "dataset_id": "5b39f139c751df2a68a61d15",
+        "execution_mode": "rag",
+        "reasoning": "Jeu décrivant les critères de répartition 2018 de la DGF pour communes/EPCI/départements — pertinent pour comprendre la répartition des dotations aux communes; un extrait suffit pour présenter le dataset."
+      },
+      {
+        "dataset_id": "6984e42c4abb23c7072e5f41",
+        "execution_mode": "rag",
+        "reasoning": "Jeu historique des montants annuels de la dotation de fonctionnement attribuée aux communes — utile pour connaître les montants et l'historique; présentation basée sur la description/métadonnées suffit."
+      },
+      {
+        "dataset_id": "5b1fddff88ee380ba46f3d20",
+        "execution_mode": "rag",
+        "reasoning": "Jeu similaire listant les critères de répartition 2018 de la DGF pour les communes — pertinent pour le détail des variables utilisées dans le calcul; un échantillon permet de l'illustrer."
+      },
+      {
+        "dataset_id": "5f68c4ec93e22c89418021e3",
+        "execution_mode": "technical",
+        "reasoning": "Jeu OFGL couvrant explicitement les comptes consolidés des communes pour 2017-2024 — pertinent pour séries temporelles de budgets communaux ; mode 'technical' nécessaire pour vérifier champs, granularité et années couvertes."
+      },
+      {
+        "dataset_id": "611c5045c75f1165fe46ea4d",
+        "execution_mode": "technical",
+        "reasoning": "Jeu 'Les Budgets 2020' (Grand Paris Sud) fournissant données budgétaires municipales pour 2020 — utile pour montrer un jeu de données local et confirmer détails/structure; mode 'technical' pour vérifier périmètre et format."
+      },
+      {
+        "dataset_id": "5cddfdcc9ce2e76d8fbdb18a",
+        "execution_mode": "technical",
+        "reasoning": "Jeu OFGL sur l'investissement public local : pertinent pour les variables budgétaires et nécessite une recherche des colonnes d'identifiants (code INSEE, SIREN, millésime) pour pouvoir joindre avec DGCL/DGFIP."
+      },
+      {
+        "dataset_id": "5b39f139c751df2a68a61d15",
+        "execution_mode": "technical",
+        "reasoning": "Jeu DGF (Ministère) contenant les données utilisées pour le calcul de la DGF : source prioritaire pour retrouver les codes INSEE/identifiants DGCL/DGFIP et comprendre les clés de répartition — demande une recherche ciblée des champs."
+      },
+      {
+        "dataset_id": "5d501be86f44414c3efc77ad",
+        "execution_mode": "technical",
+        "reasoning": "Base BANATIC (DGCL) sur l'intercommunalité : utile pour les liens communes↔EPCI (SIREN, périmètres, fichiers A/B/C/E). Nécessite de vérifier les fichiers et champs pour établir les clés de jointure."
+      }
+    ],
+    "answer": "Voici les principaux types de jeux de données disponibles sur le budget des communes françaises (exemples trouvés et leurs URL). Cette liste regroupe les ressources locales (portails de communes/territoires), thématiques (culture, dotations) et nationales / d’observation financière.\n\n1) Budgets primitifs (prévisions annuelles) — jeux locaux\n- Exemple : Budget Primitif 2019 — Ville de Lanester. Contenu : budget primitif M14 pour 2019, montants par section (F/I), nature, chapitre, fonction, gestionnaire, montants prévisionnels.\n  - Budget Primitif 2019 (Ville de Lanester): https://www.data.gouv.fr/datasets/budget-primitif-2019-2\n- Exemple : Budgets primitifs (Commune de Saint‑Paul‑lès‑Dax). Contenu similaire (BP par année, nomenclature M14).\n  - Budgets primitifs (Saint‑Paul‑lès‑Dax): https://www.data.gouv.fr/datasets/budgets-primitifs\n- Remarque : ces jeux sont fréquemment publiés par chaque collectivité ; couverture et années varient selon la commune.\n\n2) Dépenses ventilées par nature / fonction — détails comptables\n- Exemple local long-terme : Les dépenses de fonctionnement (2008–2020) — Ville d'Issy‑les‑Moulineaux (dépenses par type / nature).\n  - Les dépenses de fonctionnement par types de dépenses (Issy‑les‑Moulineaux): https://www.data.gouv.fr/datasets/les-depenses-de-fonctionnement-par-types-de-depenses\n- Exemple grandes séries par nature et fonction : Budgets Votés – Budget Principal 2009–2017 (Paris) : ventile dépenses par nature ET par fonction (nomenclature M14/M52).\n  - Budgets Votés - Budget Principal 2009 - 2017 (Ville de Paris): https://www.data.gouv.fr/datasets/budgets-votes-budget-principal-2009-2017-m14-m52-ville-departement\n- Remarque : certains jeux locaux donnent un découpage fin (nature, chapitre, fonction) — utiles pour analyses poste‑à‑poste.\n\n3) Jeux thématiques (ex. culture) — dépenses sectorielles par commune\n- Exemple national thématique : Dépenses culturelles des communes (Ministère de la Culture, 2023) — totaux culture, F/I, €/habitant, parts (%) par commune.\n  - Dépenses culturelles des communes (Ministère de la Culture): https://www.data.gouv.fr/datasets/depenses-culturelles-des-communes\n- Remarque : ces jeux donnent des séries thématiques prêtes à l’usage (par secteur), souvent pour une année donnée.\n\n4) Comptes administratifs / comptes consolidés (observatoire national)\n- Exemple d’observation nationale : Comptes consolidés des communes 2017–2024 (Observatoire des Finances et de la Gestion publique Locales) — couvre comptes consolidés sur plusieurs années.\n  - Comptes consolidés des communes 2017-2024 (OFGL): https://www.data.gouv.fr/datasets/comptes-consolides-des-communes-2017-2024\n- Remarque : ces jeux sont utiles pour analyser l’exécution (comptes administratifs) et séries multi‑années au plan national.\n\n5) Dotations et recettes locales (DGF, produits fiscaux) — paramètres et montants\n- Critères / ventilations DGF 2018 (Ministère de l’Intérieur) — détail des critères et variables utilisés pour répartir la Dotation Globale de Fonctionnement (champs, produits fiscaux, potentiels, effort fiscal).\n  - Critères de répartition 2018 pour la Dotation Globale de Fonctionnement (DGF): https://www.data.gouv.fr/datasets/criteres-de-repartition-2018-pour-la-dotation-globale-de-fonctionnement-dgf\n- Historique / montants de dotations (modélisation) : Montants des dotations de fonctionnement aux communes (LexImpact) — archive ZIP contenant paramètres/historiques.\n  - Montants des dotations de fonctionnement aux communes (LexImpact): https://www.data.gouv.fr/datasets/montants-des-dotations-de-fonctionnement-aux-communes\n- Remarque : DGF/DGFIP/DGCL fournissent les données fiscales et dotations nécessaires pour reconstituer les recettes locales.\n\n6) Jeux locaux d’exemples / années isolées (utile pour méthodes)\n- Les Budgets 2020 (Grand Paris Sud) — exemple 2020, colonnes BGT_ANNEE, BGT_SIRET, BGT_MTREAL, etc.; utile pour pipeline data (mais couvre surtout 2020).\n  - Les Budgets 2020 (Grand Paris Sud): https://www.data.gouv.fr/datasets/les-budgets-2020\n- BUDGET - Investissement_Public_Local (Commune de Brocas) — exemples locaux incluant code_insee16 et annee.\n  - BUDGET - Investissement_Public_Local (Brocas): https://www.data.gouv.fr/datasets/budget-investissement-public-local\n\n7) Référentiels & intercommunalité (pour jointures)\n- Base nationale sur l'inter-communalité (BANATIC / lien dataset) — pour lier communes ↔ EPCI.\n  - BAse NATionale sur l'Inter-Communalité: https://www.data.gouv.fr/datasets/base-nationale-sur-linter-communalite\n- Remarque : les jointures entre jeux budgétaires se font classiquement sur code INSEE (commune) et SIREN (EPCI / entité). Les jeux fournis indiquent explicitement ces clés (ex. code_insee16, SIREN). Voir les ressources techniques/aperçus fournis plus haut.\n\n8) Points pratiques et limites observées dans les ressources fournies\n- Couverture variable : beaucoup de jeux sont publiés localement (commune, intercommunalité, métropole) — il n’existe pas, dans les extraits fournis, un seul jeu national unique couvrant «pour toutes les communes et toutes les années» tous les postes (BP + CA + ventilation détaillée). Pour les séries nationales multi‑années, privilégier :\n  - Comptes consolidés OFGL (2017–2024) pour exécution multi‑années (voir OFGL ci‑dessus).\n  - Jeux DGF/DGFIP/DGCL pour recettes et dotations (critères et montants).\n  - Compléter par jeux locaux (BP, budgets votés, dépenses détaillées) publiés par chaque collectivité.\n- Exemple concret de série temporelle : le jeu «Budgets Votés — Paris (2009–2017)» et «Les Budgets 2020 (Grand Paris Sud)» existent mais sont locaux ; il faut agréger plusieurs sources pour construire une série nationale 2010/2015/2020/2024.\n\n9) Clés de jointure recommandées (extraites des ressources techniques)\n- Code INSEE de la commune (format 5 caractères) + année → clé primaire pour lier la plupart des jeux communaux (BP, CA, OFGL, DGF). (Voir exemples dans les métadonnées: code_insee16, code INSEE: ex. fichier DGF preview.)\n- SIREN (9 chiffres) pour joindre aux jeux EPCI / Banatic. (Voir Base nationale sur l'inter-communalité / fichiers d’exemple.)\n  - BAse NATionale sur l'Inter-Communalité: https://www.data.gouv.fr/datasets/base-nationale-sur-linter-communalite\n\nConclusion courte\n- Vous trouverez sur data.gouv.fr et sur les catalogues locaux des jeux de données couvrant : budgets primitifs par commune (ex. Lanester, Saint‑Paul‑lès‑Dax), dépenses détaillées par nature/fonction (Issy‑les‑Moulineaux, Paris), comptes consolidés multi‑années (OFGL 2017–2024), dotations/fiscalité (DGF 2018, LexImpact) et jeux thématiques (dépenses culturelles). Pour une analyse nationale et multi‑années il faudra agréger : OFGL (comptes), DGF/DGFIP (recettes/dotations) et compléter par les open data locaux (BP / budgets votés) pour les ventilations fines.\n\nCette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr). Sources citées (exemples) :\n- Budget Primitif 2019 (Ville de Lanester): https://www.data.gouv.fr/datasets/budget-primitif-2019-2\n- Budgets primitifs (Saint‑Paul‑lès‑Dax): https://www.data.gouv.fr/datasets/budgets-primitifs\n- Les dépenses de fonctionnement par types de dépenses (Issy‑les‑Moulineaux): https://www.data.gouv.fr/datasets/les-depenses-de-fonctionnement-par-types-de-depenses\n- Dépenses culturelles des communes (Ministère de la Culture): https://www.data.gouv.fr/datasets/depenses-culturelles-des-communes\n- Budgets Votés - Budget Principal 2009 - 2017 (Ville de Paris): https://www.data.gouv.fr/datasets/budgets-votes-budget-principal-2009-2017-m14-m52-ville-departement\n- Critères de répartition 2018 pour la Dotation Globale de Fonctionnement (DGF): https://www.data.gouv.fr/datasets/criteres-de-repartition-2018-pour-la-dotation-globale-de-fonctionnement-dgf\n- Montants des dotations de fonctionnement aux communes (LexImpact): https://www.data.gouv.fr/datasets/montants-des-dotations-de-fonctionnement-aux-communes\n- Comptes consolidés des communes 2017-2024 (Observatoire des Finances et de la Gestion publique Locales): https://www.data.gouv.fr/datasets/comptes-consolides-des-communes-2017-2024\n- Les Budgets 2020 (Grand Paris Sud): https://www.data.gouv.fr/datasets/les-budgets-2020\n- BUDGET - Investissement_Public_Local (Brocas): https://www.data.gouv.fr/datasets/budget-investissement-public-local\n- BAse NATionale sur l'Inter-Communalité: https://www.data.gouv.fr/datasets/base-nationale-sur-linter-communalite\n\nSi vous voulez, avec ces précisions vous pouvez maintenant identifier précisément les jeux couvrant la ou les communes et années qui vous intéressent (par ex. OFGL + DGF pour séries nationales, puis compléter par jeux locaux pour ventilations). [[ ## completed ## ]]",
+    "total_tokens": 0,
+    "cost_usd": "0.5945066"
+  },
+  {
+    "id": "Q5",
+    "question": "Quelles sont les communes françaises ayant une population supérieure à 100 000 habitants ?",
+    "type": "analytical",
+    "domain": "demographics",
+    "elapsed_s": 123.1,
+    "subqueries": [
+      "population légale par commune INSEE population municipale par commune CSV populations légales 2020 2021 2022 2023 liste communes France"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 5,
+    "datasets_selected": 3,
+    "routing_counts": {
+      "technical": 3
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "65b1a75854fb88f787f72944",
+        "execution_mode": "technical",
+        "reasoning": "Table ‘Population municipale des communes - France entière’ couvrant les communes depuis 2013 ; nécessaire pour rechercher et filtrer toutes les communes par population municipale et extraire celles >100 000."
+      },
+      {
+        "dataset_id": "6953c04fd58bdcf069a2e6d2",
+        "execution_mode": "technical",
+        "reasoning": "Jeu ‘Populations de référence’ (INSEE) fournissant les populations légales officielles ; utile pour obtenir la liste officielle des communes dont la population légale dépasse 100 000."
+      },
+      {
+        "dataset_id": "60ca931a789e45a2b52ee2c1",
+        "execution_mode": "technical",
+        "reasoning": "Jeu ‘Populations légales Communes et Arrondissements Municipaux - Millésimé’ couvrant les millésimes 2018–2023 ; permet de choisir l’année/millésime précis et de calculer/filtrer les communes >100 000 pour l’année souhaitée."
+      }
+    ],
+    "answer": "Voici la liste des communes (ou arrondissements municipaux) dont la population municipale 2023 (p23_pop) est >= 100 000 habitants, extraite du pré‑affichage du fichier \"POPULATION_MUNICIPALE_COMMUNES_FRANCE.xlsx\" :\n\n1. Toulouse (31555) — 514 819  \n2. Nice (06088) — 357 737  \n3. Nantes (44109) — 327 734  \n4. Montpellier (34172) — 310 240  \n5. Strasbourg (67482) — 293 771  \n6. Bordeaux (33063) — 267 991  \n7. Lille (59350) — 238 246  \n8. Rennes (35238) — 230 890  \n9. Paris 15e Arrondissement (75115) — 229 713  \n10. Paris 20e Arrondissement (75120) — 185 140  \n11. Paris 18e Arrondissement (75118) — 183 127  \n12. Paris 13e Arrondissement (75113) — 181 271  \n13. Toulon (83137) — 179 116  \n14. Paris 19e Arrondissement (75119) — 178 691  \n15. Reims (51454) — 177 674  \n16. Saint‑Étienne (42218) — 173 136  \n17. Le Havre (76351) — 166 687  \n18. Villeurbanne (69266) — 163 684  \n19. Dijon (21231) — 161 830  \n20. Paris 16e Arrondissement (75116) — 159 386  \n21. Paris 17e Arrondissement (75117) — 159 212  \n22. Angers (49007) — 159 022  \n23. Grenoble (38185) — 156 140  \n24. Saint‑Denis (97411) — 155 634  \n25. Nîmes (30189) — 151 839  \n26. Aix‑en‑Provence (13001) — 149 695  \n27. Saint‑Denis (93066) — 149 077  \n28. Clermont‑Ferrand (63113) — 146 351  \n29. Le Mans (72181) — 146 249  \n30. Brest (29019) — 142 346  \n31. Tours (37261) — 139 259  \n32. Paris 11e Arrondissement (75111) — 138 170  \n33. Paris 12e Arrondissement (75112) — 138 024  \n34. Paris 14e Arrondissement (75114) — 136 455  \n35. Amiens (80021) — 136 449  \n36. Annecy (74010) — 132 117  \n37. Limoges (87085) — 129 937  \n38. Metz (57463) — 122 572  \n39. Perpignan (66136) — 121 616  \n40. Boulogne‑Billancourt (92012) — 119 019  \n41. Besançon (25056) — 118 489  \n42. Rouen (76540) — 117 662  \n43. Orléans (45234) — 116 357  \n44. Montreuil (93048) — 111 934  \n45. Caen (14118) — 109 400  \n46. Saint‑Paul (97415) — 108 088  \n47. Argenteuil (95018) — 106 130  \n48. Mulhouse (68224) — 104 978  \n49. Nancy (54395) — 103 671  \n50. Lyon 3e Arrondissement (69383) — 100 679\n\nSources et références pour vérification\n- \"Population municipale des communes - France entière\" (pré‑affichage du fichier POPULATION_MUNICIPALE_COMMUNES_FRANCE.xlsx) — jeu disponible sur data.gouv.fr : https://www.data.gouv.fr/datasets/population-municipale-des-communes-france-entiere\n- Série officielle INSEE \"Populations de référence\" (recensement / populations légales) : https://www.data.gouv.fr/datasets/populations-de-reference-1 et métadonnée Insee : https://www.insee.fr/fr/metadonnees/source/serie/s1321\n\nRemarques et limites\n- La liste ci‑dessus provient de l’extrait (pré‑affichage) fourni et correspond à la colonne p23_pop (population municipale 2023). Pour confirmer ces chiffres, obtenir d’autres millésimes (2020–2022) ou télécharger l’intégralité du tableau, téléchargez le/les fichier(s) CSV complets depuis les ressources INSEE/data.gouv.fr citées.\n- Notez que certains codes correspondent à des arrondissements municipaux (Paris, Lyon) qui apparaissent dans ces séries.\n\nCette réponse s’appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).",
+    "total_tokens": 0,
+    "cost_usd": "0.02752064"
+  },
+  {
+    "id": "Q6",
+    "question": "Quels jeux de données concernent les établissements scolaires en France ?",
+    "type": "discovery",
+    "domain": "education",
+    "elapsed_s": 2700.0,
+    "subqueries": [
+      "Annuaire national des établissements scolaires France (UAI, SIRET, nom, adresse)",
+      "Géolocalisation des établissements scolaires France (points, coordonnées GPS, shapefiles)",
+      "Effectifs élèves par établissement scolaire France (nombre d'élèves, classes, niveaux)",
+      "Résultats au baccalauréat par établissement lycée France",
+      "Personnel enseignant et personnel non-enseignant par établissement scolaire France",
+      "Carte scolaire / sectorisation et affectation des établissements scolaires France",
+      "Infrastructures et équipements des établissements scolaires France (capacité, cantines, internats, installations sportives)"
+    ],
+    "n_subqueries": 7,
+    "datasets_retrieved": 21,
+    "datasets_selected": 16,
+    "routing_counts": {
+      "technical": 7,
+      "rag": 9
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "5889d03fa3a72974cbf0d5b1",
+        "execution_mode": "technical",
+        "reasoning": "Jeu national officiel couvrant les établissements scolaires en France — il faut rechercher/valider la présence des champs UAI, SIRET, nom et adresse (recherche technique)."
+      },
+      {
+        "dataset_id": "63041a7281410440b39c0161",
+        "execution_mode": "rag",
+        "reasoning": "Extrait local (Orléans Métropole) tiré de l'annuaire national — un échantillon aléatoire suffit pour illustrer la structure (ex. UAI/SIRET/nom/adresse) mais ce n'est pas le fichier national complet."
+      },
+      {
+        "dataset_id": "634fee40729fdbff7159a0a1",
+        "execution_mode": "rag",
+        "reasoning": "Jeu national d'indices pour écoles et collèges avec géolocalisation ajoutée — un échantillon aléatoire permettra de vérifier la présence et le format des coordonnées GPS pour la France métropolitaine et DROM."
+      },
+      {
+        "dataset_id": "5369996aa3a729239d205247",
+        "execution_mode": "rag",
+        "reasoning": "Couche ponctuelle départementale (Loir‑et‑Cher) des établissements scolaires géocodés — un échantillon suffit pour confirmer la structure point/coordonnées."
+      },
+      {
+        "dataset_id": "59aea7cab595087a239169e0",
+        "execution_mode": "rag",
+        "reasoning": "Liste et adresses des établissements scolaires de la Ville de Nice avec coordonnées — utile pour exemple municipal; un échantillon permet de vérifier les champs d'adresse et GPS."
+      },
+      {
+        "dataset_id": "606d2e53a6b3c9d4089baccd",
+        "execution_mode": "technical",
+        "reasoning": "Jeu national du Ministère fournissant les effectifs par école, niveaux et nombre de classes — nécessaire de rechercher et filtrer par établissement/année."
+      },
+      {
+        "dataset_id": "59591ec6a3a7291dcf9c8189",
+        "execution_mode": "technical",
+        "reasoning": "Effectifs des lycées en Île‑de‑France (par académie/département) — pertinent pour les lycées franciliens et nécessite une recherche ciblée."
+      },
+      {
+        "dataset_id": "685e66c2a235d4a8b57c4938",
+        "execution_mode": "technical",
+        "reasoning": "Jeu local (GrandSoissons) détaillant effectifs par niveau et nombre de classes par école — utile pour analyses par établissement sur ce territoire et nécessite filtrage."
+      },
+      {
+        "dataset_id": "5369968fa3a729239d204a82",
+        "execution_mode": "technical",
+        "reasoning": "Contient des indicateurs de résultat établis pour chaque lycée à partir des résultats au baccalauréat ; il faut rechercher/extraire les enregistrements par établissement (mode technique)."
+      },
+      {
+        "dataset_id": "66ecf357318e240e0517bf12",
+        "execution_mode": "technical",
+        "reasoning": "Indicateurs d'encadrement H/E et E/S secteur public : données au niveau d'établissement susceptibles d'inclure ou permettre de calculer les effectifs enseignants et indicateurs par établissement — nécessite recherche/filtrage dans le fichier."
+      },
+      {
+        "dataset_id": "66ecf35d318e240e0517bf13",
+        "execution_mode": "technical",
+        "reasoning": "Indicateurs d'encadrement H/E et E/S secteur privé sous contrat : équivalent pour les établissements privés sous contrat, utile pour couvrir l'ensemble des établissements scolaires — nécessite recherche/filtrage dans le fichier."
+      },
+      {
+        "dataset_id": "611621b4015cc1e65f3c91ca",
+        "execution_mode": "rag",
+        "reasoning": "Secteurs d'affectation des collèges de la Métropole de Lyon — carte scolaire/sectorisation explicite pour établissements scolaires."
+      },
+      {
+        "dataset_id": "6074e04471db61f2be9baccd",
+        "execution_mode": "rag",
+        "reasoning": "Sectorisation des collèges publics en Maine-et-Loire — concerne la carte scolaire et l'affectation des élèves."
+      },
+      {
+        "dataset_id": "6525e7b23296ddf0896e33b1",
+        "execution_mode": "rag",
+        "reasoning": "Sectorisation scolaire d'Anglet (maternelles et élémentaires) — carte scolaire par adresse de résidence."
+      },
+      {
+        "dataset_id": "69968aef60f010cb3ad2da25",
+        "execution_mode": "rag",
+        "reasoning": "Titre et description indiquent explicitement qu'il s'agit des sections sportives scolaires implantées dans les établissements du 2nd degré en France (rentrée 2025) — un échantillon aléatoire suffit pour confirmer la pertinence."
+      },
+      {
+        "dataset_id": "680866303d11ed9472622e14",
+        "execution_mode": "rag",
+        "reasoning": "Le jeu recense les établissements publics et privés de France qui ont un internat et fournit des informations sur le nombre de lits (capacités) — la description suffit pour établir la pertinence pour la sous-requête."
+      }
+    ],
+    "answer": "Voici les jeux de données (sur data.gouv.fr) qui concernent les établissements scolaires en France, classés par thématique avec ce qu’ils apportent et leurs limites (résumé synthétique) :\n\n1) Annuaire national (identifiants UAI, SIRET, nom, adresse)\n- Annuaire de l'éducation — contient le répertoire officiel des établissements (UAI, nom, adresses ; exemple d’enregistrement montre aussi un SIRET) : https://www.data.gouv.fr/datasets/annuaire-de-leducation\n- Exemple local (extrait utilisé pour vérification) : Annuaire des établissements scolaires - Orléans Métropole — illustre UAI / SIRET / nom / adresse : https://www.data.gouv.fr/datasets/annuaire-des-etablissements-scolaires-orleans-metropole\n  - Limite observée : pour l’annuaire national il faut parser l’en‑tête complet pour localiser précisément la colonne SIRET mais le fichier contient bien UAI, nom et éléments d’adresse (preuve fournie par l’exemple).\n\n2) Géolocalisation (points, shapefiles, géométries)\n- Localisation des établissements scolaires publics ou privés — ressource indiquée au format shp (shapefile) pour positions d’établissements : https://www.data.gouv.fr/datasets/localisation-des-etablissements-scolaires-publics-ou-prives-30383229\n- Sectorisation / shapefiles locaux avec géométries (exemples ci‑dessous) fournissent polygones et / ou centroides :\n  - Secteurs des collèges de la Métropole de Lyon (GeoJSON / shapefile) : https://www.data.gouv.fr/datasets/secteurs-des-colleges-de-la-metropole-de-lyon\n  - Sectorisation des collèges publics en Maine‑et‑Loire (GeoJSON/CSV/shp) : https://www.data.gouv.fr/datasets/sectorisation-des-colleges-publics-en-maine-et-loire\n  - Sectorisation scolaire - maternelles et élémentaires Anglet (GeoJSON/CSV/shp) : https://www.data.gouv.fr/datasets/sectorisation-scolaire-maternelles-et-elementaires-anglet\n  - Remarque : dans le contexte fourni certains shapefiles référencés étaient indisponibles (404) ou non extraits dans l’environnement d’analyse ; d’autres ressources locales contiennent geo_point_2d ou géométries exploitables — il faut télécharger/extraire les fichiers pour confirmation complète.\n\n3) Effectifs d’élèves par établissement / par niveau / par classes\n- Effectifs d’élèves par école (observations début octobre, Ministère de l'Éducation nationale) — contient, par école, le nombre total de classes, nombre d’élèves et répartition par niveaux (CP..CM2, ULIS, UEEA) : https://www.data.gouv.fr/datasets/effectifs-deleves-par-niveau-et-nombre-de-classes-par-ecole-date-dobservation-au-debut-du-mois-doctobre-chaque-annee\n- Effectifs d’élèves par niveau (ex. GrandSoissons Agglomération — jeu local montrant schéma et colonnes détaillées) : https://www.data.gouv.fr/datasets/effectifs-deleves-par-niveau-et-nombre-de-classes-par-ecole-grandsoissons-agglomeration-date-dobservation-au-debut-du-mois-doctobre-chaque-annee\n- Effectifs d'élèves des lycées franciliens (exemple régional) : https://www.data.gouv.fr/datasets/effectifs-deleves-des-lycees-franciliens\n  - Limite observée : certains fichiers régionaux/agrégés donnent des effectifs par catégorie ou agrégat (parfois sans nom d’établissement détaillé). Le jeu «Effectifs d’élèves par école» et des fichiers locaux fournissent en revanche une table établissement‑par‑établissement.\n\n4) Résultats au baccalauréat par établissement (lycées)\n- Indicateurs de résultat des lycées d'enseignement général et technologique (ex. jeu IDF 2012) et fichiers lycées (aperçu montre colonnes taux_brut_de_reussite_... par établissement) : https://www.data.gouv.fr/datasets/indicateurs-de-resultat-des-lycees-d-enseignement-general-et-technologique-2012-idf\n- Le fichier lycées examiné en preview contient des colonnes d’effectifs par série et de taux de réussite par établissement (ex. ligne pour \"LYCEE OZAR HATORAH FILLES\"), ce qui permet de produire des tableaux de résultats par établissement après parsing.\n  - Limite observée : j’ai pu vérifier la présence des colonnes via l’aperçu mais l’agrégation complète n’a pas été exécutée dans l’environnement (scripts prêts mais non lancés).\n\n5) Personnel enseignant et non‑enseignant (indicateurs / limites)\n- Indicateurs d'encadrement H/E et E/S (secteur public) — donne numérateurs/dénominateurs et ratios H/E (heures/élèves) et E/S par établissement : https://www.data.gouv.fr/datasets/indicateurs-dencadrement-h-e-et-e-s-a-la-rentree-dans-le-secteur-public\n- Indicateurs d'encadrement H/E et E/S (secteur privé sous contrat) — même type d’indicateurs pour le privé : https://www.data.gouv.fr/datasets/indicateurs-dencadrement-h-e-et-e-s-a-la-rentree-dans-le-secteur-prive-sous-contrat\n  - Remarque importante : ces jeux fournissent H/E et E/S (numérateurs, dénominateurs, ratios) ; dans les extraits disponibles il n’y a pas de colonnes explicites donnant directement les effectifs de « personnels enseignants » et « personnels non‑enseignants ». Autrement dit, ces fichiers permettent d’utiliser des indicateurs d’encadrement mais pas d’obtenir une table immédiate explicite des effectifs de personnels par établissement. Pour des effectifs de personnels il faut rechercher un jeu de données dédié aux effectifs de personnel (non fourni explicitement dans les extraits fournis).\n\n6) Carte scolaire / sectorisation et affectation\n- Les jeux de sectorisation listés plus haut (Métropole de Lyon, Maine‑et‑Loire, Anglet) contiennent polygons/centroides et attributs d’affectation (UAI, nom du collège, type de zone de recrutement). Exemples :\n  - Secteurs des collèges de la Métropole de Lyon : https://www.data.gouv.fr/datasets/secteurs-des-colleges-de-la-metropole-de-lyon\n  - Sectorisation des collèges publics en Maine‑et‑Loire : https://www.data.gouv.fr/datasets/sectorisation-des-colleges-publics-en-maine-et-loire\n  - Sectorisation Anglet : https://www.data.gouv.fr/datasets/sectorisation-scolaire-maternelles-et-elementaires-anglet\n  - Utilisation : ces fichiers permettent la décision par inclusion spatiale (adresse → secteur) mais ils ne comprennent pas, dans les extraits, les règles administratives complètes d’affectation ni la liste des élèves affectés.\n\n7) Infrastructures et équipements (internats, sections sportives, etc.)\n- Sections Sportives Scolaires (rentrée 2025) — liste des établissements proposant sections sportives, présence d’internat (hebergement), disciplines, adresse et position : https://www.data.gouv.fr/datasets/sections-sportives-scolaires-1\n- Annuaire des internats — recense internats avec capacités (nombre de lits pré‑bac/post‑bac, occupés), localisation, UAI : https://www.data.gouv.fr/datasets/annuaire-des-internats\n- Autres jeux locaux (ex. listes d’écoles Nice, Orléans) donnent adresses/téléphones mais rarement un inventaire détaillé des cantines ou capacités de restauration : https://www.data.gouv.fr/datasets/liste-et-adresses-des-etablissements-scolaires (Métropole Nice Côte d'Azur) et l’exemple Orléans cité plus haut.\n  - Limite observée : les extraits fournis montrent que les jeux disponibles contiennent internats et sections sportives (avec capacité pour internats), mais peu de sources publiques listées ici donnent un inventaire exhaustif de cantines, capacités d’accueil ou détail technique des équipements sportifs — il faut des jeux complémentaires ou contacts locaux pour ces informations.\n\nConclusion rapide\n- Les principaux jeux de données couvrant les établissements scolaires (annuaire UAI/SIRET/adresses, géolocalisation/shapefiles, effectifs d’élèves par établissement, résultats du bac, indicateurs d’encadrement, sectorisation, internats/sections sportives) sont référencés ci‑dessus avec leurs URLs sur data.gouv.fr. J’ai indiqué pour chaque jeu ce qu’il apporte et les limites relevées dans les aperçus fournis (notamment : H/E ≠ effectifs personnels ; certains shapefiles ont été référencés mais non extraits dans l’environnement de preview).\n- Cette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).\n\nSi vous souhaitez une extraction précise (par ex. table UAI+SIRET+adresse pour tout le territoire, fichier des effectifs par établissement ou la couche géographique complète d’un département), il faudra télécharger et parser le(s) fichier(s) listés ci‑dessus (les URLs données). Les métadonnées/aperçus fournis indiquent que les fichiers existent et quels champs clés ils contiennent, mais certains (shapefiles ou archives) n'ont pas pu être vérifiés intégralement dans l'environnement d'analyse utilisé pour produire ce résumé.",
+    "total_tokens": 0,
+    "cost_usd": "0.99461689"
+  },
+  {
+    "id": "Q7",
+    "question": "Quels sont les jeux de données sur la production d'énergies renouvelables en France ?",
+    "type": "discovery",
+    "domain": "energy",
+    "elapsed_s": 2885.9,
+    "subqueries": [
+      "Production d'électricité renouvelable France séries temporelles par source (hydraulique, éolien, solaire, biomasse, biogaz) MWh par jour/année CSV JSON RTE ADEME Ministère data.gouv.fr",
+      "Données par installation: parcs éoliens, centrales photovoltaïques, barrages hydroélectriques — production annuelle, puissance installée (MW), coordonnées, commune, date de mise en service format tableur/geojson France",
+      "Production d'énergie renouvelable non électrique France: biomasse, biogaz, chaleur renouvelable, géothermie — production (MWh/TWh), unités/centrales, réseaux de chaleur, base ADEME Ministère data.gouv.fr",
+      "Mix de production en temps réel / horaire France: production instantanée par filière (éolien, solaire, hydraulique, thermique) API RTE ou datasets 'mix électrique' 'production horaire' 'électricité France'",
+      "Bilans et rapports annuels de production et puissance installée énergies renouvelables France (ADEME, Ministère Transition écologique, Observatoires régionaux) données agrégées par année/filère"
+    ],
+    "n_subqueries": 5,
+    "datasets_retrieved": 15,
+    "datasets_selected": 11,
+    "routing_counts": {
+      "technical": 7,
+      "rag": 4
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "5b90b88306e3e7417c2ffd33",
+        "execution_mode": "technical",
+        "reasoning": "Contient les productions régionales annuelles d'énergies renouvelables (GWh) pour l'électricité depuis 2008 — directement pertinent pour obtenir séries temporelles par source (hydro, éolien, solaire, biomasse, biogaz). Nécessite recherche/filtrage et agrégation (par source et/national) : mode 'technical'."
+      },
+      {
+        "dataset_id": "5afbd35eb595086a31734622",
+        "execution_mode": "rag",
+        "reasoning": "Jeu sur le parc national annuel éolien et solaire (MW) — utile en complément pour capacité installée. Un échantillon aléatoire suffit pour confirmer les champs et la période : mode 'rag'."
+      },
+      {
+        "dataset_id": "637f694f86f903fa78f2179c",
+        "execution_mode": "technical",
+        "reasoning": "Jeu sur les installations éoliennes par commune (puissance de raccordement, coordonnées) — pertinent pour les parcs éoliens ; il faut rechercher les champs exacts (production annuelle, date de mise en service) et confirmer le format (tableur/geojson)."
+      },
+      {
+        "dataset_id": "667e9926fb05abea41746568",
+        "execution_mode": "technical",
+        "reasoning": "Liste des installations hydroélectriques (localisation, puissance MW, année de mise en service) — directement pertinent pour les barrages ; nécessite recherche pour extraire/structurer les champs demandés."
+      },
+      {
+        "dataset_id": "67cbb2e0dbfd9f7582f0c413",
+        "execution_mode": "technical",
+        "reasoning": "Couche d'installations photovoltaïques pour Rennes (localisation, attributs d'installation) — utile pour centrales PV locales ; il faut vérifier la présence de production annuelle, coordonnées et format d'export."
+      },
+      {
+        "dataset_id": "5b90b88306e3e7417c2ffd33",
+        "execution_mode": "technical",
+        "reasoning": "Contient bilans régionaux annuels (GWh) incluant le gaz/biométhane et les productions renouvelables ; nécessite recherche/filtrage pour extraire les données non électriques (biomasse, biogaz, chaleur, géothermie) et unités/centraux/réseaux."
+      },
+      {
+        "dataset_id": "5afbd362a3a7290c45ef0714",
+        "execution_mode": "technical",
+        "reasoning": "Données éCO2mix nationales temps réel : rafraîchi chaque quart d'heure et inclut la production par filière (éolien, solaire, hydraulique, thermique). Nécessite des requêtes sur les séries temporelles pour extraire les valeurs instantanées/horaire."
+      },
+      {
+        "dataset_id": "55f0463d88ee3849f5a46ec1",
+        "execution_mode": "technical",
+        "reasoning": "Electricité: consommation, production, CO2 et échanges (RTE) : fournit la production par filière au pas demi-horaire et des historiques nationaux/régionaux. Utile pour rechercher et agréger les données horaires/instantanées."
+      },
+      {
+        "dataset_id": "603f0a1157b893262c7ce5a3",
+        "execution_mode": "rag",
+        "reasoning": "Présente facteurs de charge et taux de couverture annuels par région (2014-2025), utiles pour les bilans de performance annuels des filières renouvelables."
+      },
+      {
+        "dataset_id": "5dfc47d9dee7e7502e8c3ee0",
+        "execution_mode": "rag",
+        "reasoning": "Bilan prévisionnel électrique (2019-2025) fournissant des bilans énergétiques annuels et indicateurs (part des énergies renouvelables), pertinent pour rapports/bilans agrégés."
+      },
+      {
+        "dataset_id": "5b90b88c9ce2e7539fbc02c2",
+        "execution_mode": "rag",
+        "reasoning": "Production régionale annuelle par filière (2008-2025) en TWh, correspond exactement aux données agrégées par année et filière demandées."
+      }
+    ],
+    "answer": "Voici les jeux de données clés (sur data.gouv.fr) repérés par le pipeline pour la production d’énergies renouvelables en France, classés par usage et avec ce qu’ils fournissent / leurs limites.\n\nA — Séries annuelles de production par filière (agrégées, utilisables pour construire des séries nationales en agrégeant les régions)\n- Production régionale annuelle des énergies renouvelables (Open Data Réseaux Énergies) — données régionales annuelles par filière (hydraulique, éolien, solaire, bioénergies, gaz renouvelable), unités en GWh ; période couverte dans l’aperçu : 2008–2021. URL : https://www.data.gouv.fr/datasets/production-regionale-annuelle-des-energies-renouvelables-2008-a-2021\n  - Utilité : construire séries annuelles régionales ou nationales (somme des régions), conversion GWh → MWh ou TWh possible.\n  - Limite : agrégé par région ; pas de production par installation.\n\n- Production régionale annuelle par filière (2008 à 2025) (Open Data Réseaux Énergies) — variante/extension couvrant 2008–2025 ; colonnes en GWh par filière (nucleaire, thermique, hydraulique, éolien, solaire, bioénergies). URL : https://www.data.gouv.fr/datasets/production-regionale-annuelle-par-filiere-2008-a-2025\n  - Utilité : mêmes usages (agrégation nationale, séries temporelles par filière).\n  - Limite : pas de puissance installée par site.\n\nB — Capacités installées / parc (séries de puissance installée)\n- Parc national annuel de production éolien et solaire (2001 à 2025) (Open Data Réseaux Énergies) — séries annuelles de puissance installée (MW) pour parc éolien et solaire (2001–2025), formats CSV/JSON. URL : https://www.data.gouv.fr/datasets/parc-national-annuel-de-production-eolien-et-solaire-2001-a-2025\n  - Utilité : suivre évolution des capacités installées par filière (éolien/solaire).\n  - Limite : ne donne pas forcément la production MWh par installation.\n\nC — Jeux de données par installation / local (géolocalisation, puissance, métadonnées)\n- Installation production électrique éolienne par commune en 2021 (Communauté d'Agglomération du Pays de Saint‑Omer) — liste d’installations éoliennes par commune ; contient puissance de raccordement (MW) et coordonnées (format texte) mais pas la production annuelle. URL : https://www.data.gouv.fr/datasets/installation-production-electrique-eolienne-par-commune-en-2021\n  - Utilité : cartographie des parcs, power per site.\n  - Limite : production annuelle et date de mise en service souvent absentes.\n\n- Installations hydroélectriques en Bretagne (Observatoire de l'environnement en Bretagne) — inventaire local avec PUIS_MW, ANNEE_DEBUT (année de mise en service), commune, etc. URL : https://www.data.gouv.fr/datasets/installations-hydroelectriques-en-bretagne\n  - Utilité : puissance par barrage/installation et année de début.\n  - Limite : souvent pas de coordonnées précises pour chaque entrée et pas de production annuelle (MWh) dans l’extrait fourni.\n\n- Localisation et caractéristiques des installations de production d'électricité pour Rennes (Rennes Métropole) — dataset local listant installations PV (et potentiellement production / date / géométrie selon ressource). URL : https://www.data.gouv.fr/datasets/localisation-et-caracteristiques-des-installations-de-production-delectricite-pour-les-sites-de-rennes-ville-et-metropole\n  - Utilité : datasets locaux peuvent contenir coordonnées et parfois la puissance et date de mise en service.\n  - Limite : disponibilité des champs (production annuelle) varie et, dans l’exploration, le fichier CSV n’a pas été récupéré automatiquement.\n\nRemarque générale sur les jeux “par installation” : les sources locales fournissent souvent la puissance installée et métadonnées ; la production annuelle (MWh) par site est fréquemment absente et nécessite de croiser avec d’autres sources (exploitants, RTE, ADEME) ou d’estimer via facteur de charge.\n\nD — Mix quasi‑réel / horaire (production instantanée par filière)\n- Données éCO2mix nationales temps réel (Open Data Réseaux Énergies) — données temps réel / demi‑horaire ou pas fins (production par filière en MW : éolien, solaire, hydraulique, bioénergies, gaz, nucléaire, etc.), utiles pour variabilité horaire et corrélations. URL : https://www.data.gouv.fr/datasets/donnees-eco2mix-nationales-temps-reel-1\n  - Utilité : obtenir mix horaire/quasi‑réel par filière (MW).\n  - Limite : format parfois en CSV/ZIP/flux et nécessite parsing; l’agrégation horaire et la sélection des sous‑catégories (ex. éolien terrestre/offshore) demandent attention.\n\n- Electricité : consommation, production, CO2 et échanges (RTE) — ensemble de ressources RTE, incluant bilans, séries et métadonnées. URL : https://www.data.gouv.fr/datasets/electricite-consommation-production-co2-et-echanges\n  - Utilité : fichiers officiels RTE, bilans et séries de production (par filière) et échanges internationaux.\n  - Limite : formats et granularités variables (fichiers volumineux à parser).\n\nE — Facteurs de charge / taux de couverture (pour estimer production à partir de capacité)\n- Facteurs de charge et taux de couverture régionaux annuels des énergies renouvelables (2014 à 2025) (Open Data Réseaux Énergies) — FC (facteurs de charge) et TC (taux de couverture) par région et filière ; utile pour estimer production si on dispose seulement de MW installés. URL : https://www.data.gouv.fr/datasets/facteurs-de-charge-et-taux-de-couverture-regionaux-annuels-des-energies-renouvelables-2014-a-2025\n  - Utilité : convertir capacités (MW) en production approximative (MWh/an) via FC.\n  - Limite : estimations — pas des mesures de production par installation.\n\nF — Bilans et scénarios (synthèses nationales / prévisionnelles)\n- Bilan prévisionnel électrique 2019 - Bilans énergétiques (Open Data Réseaux Énergies) — scénarios/bilans annuels d’électricité par filière (TWh) pour années prospectives (ex. séries 2020–2026 dans le fichier). URL : https://www.data.gouv.fr/datasets/bilan-previsionnel-electrique-2019-bilans-energetiques\n  - Utilité : chiffres agrégés nationaux par filière en TWh (rapports/scénarios).\n  - Limite : document de bilan/prévision (scénarios) — utile pour comparaisons/synthèse mais distinct des données mesurées brutes.\n\nCe que les preuves fournies ne contiennent pas (limitations importantes)\n- Production annuelle (MWh) par installation (site unique) : les jeux listés donnent surtout la puissance installée, métadonnées et/ou bilans régionaux ; la production par centrale est rarement fournie directement dans les extraits fournis. Pour obtenir la production par site il faut croiser avec des bases exploitant/exploitant, RTE ou ADEME (non fournis dans les extraits).\n- Chaleur renouvelable / géothermie : les extraits fournis ne montrent pas de dataset complet pour la chaleur renouvelable (production de réseaux de chaleur, géothermie) ; ces informations sont généralement disponibles via ADEME / bases ministérielles (non incluses dans les preuves fournies).\n- Exécution automatisée : le pipeline a préparé des scripts pour agréger les séries régionales en séries nationales et pour parser eCO2mix, mais l’exécution des scripts n’a pas pu être réalisée dans l’environnement d’analyse (erreur d’exécution mentionnée). Les ressources et méthodes pour agréger/estimer sont néanmoins identifiées.\n\nRecommandations pratiques pour continuer\n- Pour obtenir des séries nationales annuelles par filière (MWh/TWh) : télécharger les fichiers \"Production régionale annuelle...\" (GWh) et sommer les régions par année (puis convertir GWh → MWh ou TWh). Voir notamment :\n  - Production régionale annuelle des énergies renouvelables (2008–2021) : https://www.data.gouv.fr/datasets/production-regionale-annuelle-des-energies-renouvelables-2008-a-2021\n  - Production régionale annuelle par filière (2008–2025) : https://www.data.gouv.fr/datasets/production-regionale-annuelle-par-filiere-2008-a-2025\n- Pour le mix horaire / quasi‑réel : utiliser eCO2mix (RTE / Open Data Réseaux Énergies) puis agréger/normaliser les colonnes par filière. Voir : https://www.data.gouv.fr/datasets/donnees-eco2mix-nationales-temps-reel-1 et https://www.data.gouv.fr/datasets/electricite-consommation-production-co2-et-echanges\n- Pour cartographier et obtenir puissance par site : utiliser les jeux locaux (parcs nationaux / inventaires locaux) cités plus haut et compléter par géocodage si nécessaire (ex. dataset Saint‑Omer, Bretagne, Rennes).\n- Pour estimer production à partir de capacités : combiner les fichiers de capacité (parc national) avec les facteurs de charge régionaux (https://www.data.gouv.fr/datasets/facteurs-de-charge-et-taux-de-couverture-regionaux-annuels-des-energies-renouvelables-2014-a-2025).\n\nCette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).\n\nPrincipales sources citées (jeux repérés et utilisés pour cette synthèse) :\n- Production régionale annuelle des énergies renouvelables (2008–2021) — https://www.data.gouv.fr/datasets/production-regionale-annuelle-des-energies-renouvelables-2008-a-2021\n- Production régionale annuelle par filière (2008–2025) — https://www.data.gouv.fr/datasets/production-regionale-annuelle-par-filiere-2008-a-2025\n- Parc national annuel de production éolien et solaire (2001–2025) — https://www.data.gouv.fr/datasets/parc-national-annuel-de-production-eolien-et-solaire-2001-a-2025\n- Installation production électrique éolienne par commune en 2021 — https://www.data.gouv.fr/datasets/installation-production-electrique-eolienne-par-commune-en-2021\n- Installations hydroélectriques en Bretagne — https://www.data.gouv.fr/datasets/installations-hydroelectriques-en-bretagne\n- Localisation et caractéristiques des installations (Rennes Métropole) — https://www.data.gouv.fr/datasets/localisation-et-caracteristiques-des-installations-de-production-delectricite-pour-les-sites-de-rennes-ville-et-metropole\n- Données éCO2mix nationales temps réel (Open Data Réseaux Énergies) — https://www.data.gouv.fr/datasets/donnees-eco2mix-nationales-temps-reel-1\n- Electricité : consommation, production, CO2 et échanges (RTE) — https://www.data.gouv.fr/datasets/electricite-consommation-production-co2-et-echanges\n- Facteurs de charge et taux de couverture régionaux annuels (2014–2025) — https://www.data.gouv.fr/datasets/facteurs-de-charge-et-taux-de-couverture-regionaux-annuels-des-energies-renouvelables-2014-a-2025\n- Bilan prévisionnel électrique 2019 - Bilans énergétiques — https://www.data.gouv.fr/datasets/bilan-previsionnel-electrique-2019-bilans-energetiques\n\nSi vous voulez, je peux (sur la base des jeux listés) vous indiquer précisément lequel télécharger en premier selon votre objectif (ex. « séries annuelles nationales par filière » vs « mix horaire ») ou vous fournir le script d’agrégation prêt à exécuter localement pour sommer les régions et convertir en MWh/TWh.",
+    "total_tokens": 0,
+    "cost_usd": "1.21420709"
+  },
+  {
+    "id": "Q8",
+    "question": "Combien de bornes de recharge pour véhicules électriques sont référencées en France ?",
+    "type": "analytical",
+    "domain": "energy",
+    "elapsed_s": 337.6,
+    "subqueries": [
+      "Base nationale des points de recharge pour véhicules électriques France bornes de recharge points de recharge nombre total mise à jour site:data.gouv.fr"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 3,
+    "datasets_selected": 2,
+    "routing_counts": {
+      "technical": 2
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "5a33609fa3a72955c32d3329",
+        "execution_mode": "technical",
+        "reasoning": "Ce jeu (Enedis) présente directement le nombre total de points de charge à la maille nationale — utile pour obtenir la valeur agrégée publiée."
+      },
+      {
+        "dataset_id": "5f2e238bef885a3f2258be26",
+        "execution_mode": "technical",
+        "reasoning": "Ce jeu (Open Data Réseaux Énergies) contient l'inventaire détaillé des points/borne publics : nécessaire si l'on doit rechercher, filtrer ou recalculer le nombre total à partir des enregistrements."
+      }
+    ],
+    "answer": "Nombre total (période de référence : 2026 T1) :\n- Total agrégé recommandé (Accessible au public + Particulier + Société) : 2 950 882 points de recharge.\n  - Accessible au public : 192 008\n  - Particulier : 1 667 790\n  - Société : 1 091 084\n\nSource principale pour ces chiffres : \"Nombre total de points de charge en France\" (Enedis) — https://www.data.gouv.fr/datasets/nombre-total-de-points-de-charge-en-france\n\nRemarques :\n- Le total indiqué (2 950 882) correspond à l'agrégation des trois catégories telles que fournies dans le jeu de données Enedis pour 2026 T1 (valeur recommandée par le jeu). [Nombre total de points de charge en France: https://www.data.gouv.fr/datasets/nombre-total-de-points-de-charge-en-france]\n- Un autre jeu de données national référençant les bornes (Open Data Réseaux Énergies) existe sur data.gouv.fr et peut fournir des informations complémentaires ou une granularité géographique différente : \"Bornes de recharge pour véhicules électriques (Open Data Réseaux Énergies)\" — https://www.data.gouv.fr/datasets/bornes-de-recharge-pour-vehicules-electriques-3\n- Note technique : l'extraction a identifié les valeurs ci‑dessus dans le jeu Enedis pour 2026 T1 ; le fichier source pouvait être dans un format ou un emplacement restreint, mais les totaux ont été fournis par le jeu de données.\n\nCette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).",
+    "total_tokens": 0,
+    "cost_usd": "0.11271889"
+  }
+]

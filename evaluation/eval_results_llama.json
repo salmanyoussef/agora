@@ -1,0 +1,216 @@
+[
+  {
+    "id": "Q1",
+    "question": "Quels jeux de données sont disponibles sur la qualité de l'air en France ?",
+    "type": "discovery",
+    "domain": "environment",
+    "model": "Llama-3.3-70B-Instruct",
+    "elapsed_s": 49.7,
+    "subqueries": [
+      "Jeux de données sur la qualité de l'air en France"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 3,
+    "datasets_selected": 3,
+    "routing_counts": {
+      "technical": 3
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "648d3089bb426985e31c70c7",
+        "execution_mode": "technical",
+        "reasoning": "This dataset provides historical data on air quality indices in France, which can be useful for understanding trends and patterns in air quality over time. Technical execution mode is chosen because the user may want to search for specific data points or compute values from the dataset."
+      },
+      {
+        "dataset_id": "648bdea4480f678d5d1c70c7",
+        "execution_mode": "technical",
+        "reasoning": "This dataset provides information on exposure to pollutants in Paris, which is relevant to air quality in France. Technical execution mode is chosen because the user may want to search for specific data points or compute values from the dataset, such as the number of people exposed to certain pollutants."
+      },
+      {
+        "dataset_id": "648a8d5723958b47eb1c70c7",
+        "execution_mode": "technical",
+        "reasoning": "This dataset provides information on the new ATMO index for air quality in France, starting from 2021. Technical execution mode is chosen because the user may want to search for specific data points or compute values from the dataset, such as the number of days with good or bad air quality."
+      }
+    ],
+    "answer": "Les jeux de données disponibles sur la qualité de l'air en France incluent \"Qualité de l'air - Indice CITEAIR jusqu’à 2020\" (https://www.data.gouv.fr/datasets/qualite-de-lair-indice-citeair-jusqua-2020), \"Qualité de l'air – Exposition des parisien(ne)s au NO2 et PM2.5\" (https://www.data.gouv.fr/datasets/qualite-de-lair-exposition-des-parisien-ne-s-au-no2-et-pm2-5), et \"Qualité de l'air - Indice ATMO à partir de 2021\" (https://www.data.gouv.fr/datasets/qualite-de-lair-indice-atmo-a-partir-de-2021). Ces datasets fournissent des informations sur les indices de qualité de l'air, l'exposition aux polluants, et les tendances dans la qualité de l'air. Cette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).",
+    "cost_usd": null
+  },
+  {
+    "id": "Q2",
+    "question": "Quelles données sur les accidents de la route en France sont disponibles sur data.gouv.fr ?",
+    "type": "discovery",
+    "domain": "transport",
+    "model": "Llama-3.3-70B-Instruct",
+    "elapsed_s": 152.9,
+    "subqueries": [
+      "Données sur les accidents de la route en France"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 3,
+    "datasets_selected": 3,
+    "routing_counts": {
+      "technical": 3
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "66c2ff094ea0a9d2ba6a6278",
+        "execution_mode": "technical",
+        "reasoning": "Ce dataset fournit des informations sur les accidents de la route en Hauts-de-France en 2017, ce qui peut être utile pour répondre à la question."
+      },
+      {
+        "dataset_id": "67377e8bb561510ce3c25386",
+        "execution_mode": "technical",
+        "reasoning": "Ce dataset fournit des informations sur les accidents de la route dans les Hautes-Pyrénées entre 2005 et 2022, ce qui peut être utile pour répondre à la question."
+      },
+      {
+        "dataset_id": "67378028b561510ce3c2553a",
+        "execution_mode": "technical",
+        "reasoning": "Ce dataset fournit des informations sur les accidents de la route dans les Hautes-Pyrénées en 2021, ce qui peut être utile pour répondre à la question."
+      }
+    ],
+    "answer": "Les données sur les accidents de la route en France disponibles sur data.gouv.fr incluent des informations sur la localisation des accidents, le nombre de blessés ou de tués, et les procès-verbaux associés, principalement pour les régions des Hauts-de-France et des Hautes-Pyrénées. Le dataset « Localisation des accidents de la circulation routière en 2017 » (Géo2France) fournit des données pour les départements du Nord, du Pas-de-Calais, de l'Oise, de la Somme et de l'Aisne en 2017. Les datasets « [DDT65] Accidentologie - Hautes-Pyrénées » et « [DDT65] Accidentologie 2021 - Hautes-Pyrénées » (DDT Hautes-Pyrénées) offrent des informations pour les Hautes-Pyrénées entre 2005 et 2022, ainsi que des données spécifiques pour l'année 2021. Ces données peuvent être téléchargées via les URLs https://www.data.gouv.fr/datasets/localisation-des-accidents-de-la-circulation-routiere-en-2017 pour le dataset Géo2France, https://www.data.gouv.fr/datasets/ddt65-accidentologie-hautes-pyrenees et https://www.data.gouv.fr/datasets/ddt65-accidentologie-2021-hautes-pyrenees pour les datasets DDT Hautes-Pyrénées. Cette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).",
+    "cost_usd": null
+  },
+  {
+    "id": "Q3",
+    "question": "Combien de stations de vélos en libre-service existe-t-il à Paris ?",
+    "type": "analytical",
+    "domain": "transport",
+    "model": "Llama-3.3-70B-Instruct",
+    "elapsed_s": 7.5,
+    "subqueries": [
+      "Nombre de stations de vélos en libre-service à Paris"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 3,
+    "datasets_selected": 0,
+    "routing_counts": {},
+    "dataset_decisions": [],
+    "answer": "Malheureusement, les informations nécessaires pour déterminer le nombre exact de stations de vélos en libre-service à Paris ne sont pas fournies dans les données disponibles. Pour obtenir cette information, il serait recommandé de consulter les données officielles de la ville de Paris ou les portails de données ouvertes françaises, tels que data.gouv.fr. Cette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr), mais dans ce cas, les données spécifiques à la question posée n'ont pas été fournies.",
+    "cost_usd": null
+  },
+  {
+    "id": "Q4",
+    "question": "Quels sont les jeux de données disponibles sur le budget des communes françaises ?",
+    "type": "discovery",
+    "domain": "finance",
+    "model": "Llama-3.3-70B-Instruct",
+    "elapsed_s": 17.2,
+    "subqueries": [
+      "Jeux de données sur le budget des communes françaises"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 3,
+    "datasets_selected": 1,
+    "routing_counts": {
+      "technical": 1
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "5cddfddf9ce2e76d93bdb183",
+        "execution_mode": "technical",
+        "reasoning": "Ce jeu de données fournit des informations spécifiques sur le budget des communes françaises et le mode d'exécution \"technical\" permet de rechercher des informations spécifiques sur le budget."
+      }
+    ],
+    "answer": "Il existe des jeux de données disponibles sur le budget des communes françaises, tels que le jeu de données \"BUDGET - Dotation_globale_fonctionnement (Commune de Brocas)\" disponible sur [data.gouv.fr](https://www.data.gouv.fr/datasets/budget-dotation-globale-fonctionnement), qui fournit des informations sur l'évolution de la dotation globale de fonctionnement entre 2014 et 2016. Pour obtenir des informations plus précises et détaillées sur le budget des communes, il est recommandé de consulter directement les fichiers CSV ou d'utiliser des outils d'analyse de données. Cette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).",
+    "cost_usd": null
+  },
+  {
+    "id": "Q5",
+    "question": "Quelles sont les communes françaises ayant une population supérieure à 100 000 habitants ?",
+    "type": "analytical",
+    "domain": "demographics",
+    "model": "Llama-3.3-70B-Instruct",
+    "elapsed_s": 15.6,
+    "subqueries": [
+      "Communes françaises avec plus de 100 000 habitants"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 3,
+    "datasets_selected": 0,
+    "routing_counts": {},
+    "dataset_decisions": [],
+    "answer": "Malheureusement, les données fournies ne permettent pas d'identifier avec précision les communes françaises ayant une population supérieure à 100 000 habitants, car les blocs d'évidence attendus pour cette requête sont absents. Pour obtenir une réponse précise, il serait nécessaire de consulter des données démographiques actualisées provenant de sources fiables telles que l'Institut National de la Statistique et des Études Économiques (INSEE) ou d'autres datasets pertinents sur le portail des données ouvertes françaises (data.gouv.fr). Cette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr), mais en l'absence de données spécifiques, nous ne pouvons pas fournir une liste exhaustive des communes répondant aux critères.",
+    "cost_usd": null
+  },
+  {
+    "id": "Q6",
+    "question": "Quels jeux de données concernent les établissements scolaires en France ?",
+    "type": "discovery",
+    "domain": "education",
+    "model": "Llama-3.3-70B-Instruct",
+    "elapsed_s": 88.2,
+    "subqueries": [
+      "Jeux de données sur les établissements scolaires en France"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 3,
+    "datasets_selected": 3,
+    "routing_counts": {
+      "technical": 3
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "59591a75a3a7291dcf9c810c",
+        "execution_mode": "technical",
+        "reasoning": "Ce jeu de données fournit des informations sur les secteurs scolaires des écoles élémentaires à Paris, ce qui peut être utile pour comprendre la répartition des établissements scolaires dans la région."
+      },
+      {
+        "dataset_id": "697955d54ba57932dd986a94",
+        "execution_mode": "technical",
+        "reasoning": "Ce jeu de données offre des informations sur la répartition des établissements scolaires dans le département de l'Oise, ce qui peut aider à identifier les tendances et les modèles dans la distribution des établissements scolaires."
+      },
+      {
+        "dataset_id": "5cf8918906e3e7403dc3efe7",
+        "execution_mode": "technical",
+        "reasoning": "Ce jeu de données recense les établissements du premier et du second degrés situés en France et fermés, ce qui peut fournir des informations sur les tendances de fermeture des établissements scolaires."
+      }
+    ],
+    "answer": "Les jeux de données concernant les établissements scolaires en France incluent « [Secteurs scolaires - écoles élémentaires de Paris](https://www.data.gouv.fr/datasets/secteurs-scolaires-de-paris) », qui fournit des informations sur les secteurs scolaires des écoles élémentaires à Paris, et « [Établissements fermés](https://www.data.gouv.fr/datasets/etablissements-fermes) », qui contient des données sur les établissements scolaires fermés en France, notamment à Mayotte et La Réunion. Malheureusement, les données sur « [Répartitions des établissements scolaires du département de l'Oise](https://www.data.gouv.fr/datasets/repartitions-des-etablissements-scolaires-du-departement-de-loise) » n'ont pas pu être analysées en raison d'un problème technique. Cette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr).",
+    "cost_usd": null
+  },
+  {
+    "id": "Q7",
+    "question": "Quels sont les jeux de données sur la production d'énergies renouvelables en France ?",
+    "type": "discovery",
+    "domain": "energy",
+    "model": "Llama-3.3-70B-Instruct",
+    "elapsed_s": 11.9,
+    "subqueries": [
+      "Jeux de données sur la production d'énergies renouvelables en France"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 3,
+    "datasets_selected": 0,
+    "routing_counts": {},
+    "dataset_decisions": [],
+    "answer": "Malheureusement, les informations fournies ne permettent pas de donner une réponse détaillée sur les jeux de données spécifiques concernant la production d'énergies renouvelables en France. Pour trouver ces informations, il est recommandé de consulter directement le portail des données ouvertes du gouvernement français (data.gouv.fr). Cette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr), mais les détails spécifiques sur les jeux de données en question ne sont pas disponibles dans les informations fournies.",
+    "cost_usd": null
+  },
+  {
+    "id": "Q8",
+    "question": "Combien de bornes de recharge pour véhicules électriques sont référencées en France ?",
+    "type": "analytical",
+    "domain": "energy",
+    "model": "Llama-3.3-70B-Instruct",
+    "elapsed_s": 12.0,
+    "subqueries": [
+      "Nombre de bornes de recharge pour véhicules électriques en France"
+    ],
+    "n_subqueries": 1,
+    "datasets_retrieved": 3,
+    "datasets_selected": 1,
+    "routing_counts": {
+      "technical": 1
+    },
+    "dataset_decisions": [
+      {
+        "dataset_id": "5fd352b8a67e2b29ecd8fd08",
+        "execution_mode": "technical",
+        "reasoning": "This dataset seems to offer comprehensive data on electric vehicle charging stations, potentially allowing for the computation of the total number of stations in France."
+      }
+    ],
+    "answer": "Malheureusement, nous ne pouvons pas fournir un nombre précis de bornes de recharge pour véhicules électriques en France en raison du manque d'informations dans les données disponibles. Cependant, pour obtenir des informations à jour, il est recommandé de consulter directement le dataset \"Bornes de Recharge pour Véhicules Électriques\" sur le site data.gouv.fr. Cette réponse s'appuie sur des jeux de données issus des données ouvertes françaises (data.gouv.fr), notamment le dataset \"Bornes de Recharge pour Véhicules Électriques\" disponible à l'adresse https://www.data.gouv.fr/datasets/bornes-de-recharge-pour-vehicules-electriques-5.",
+    "cost_usd": null
+  }
+]
