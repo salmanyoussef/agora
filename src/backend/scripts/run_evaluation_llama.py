@@ -72,12 +72,18 @@ def run_query(qid, question, qtype, domain, k=3):
     routing_counts: dict[str, int] = {}
     dataset_decisions = []
     for ds in selected:
-        mode = getattr(ds, "execution_mode", "unknown")
+        mode = ds.get("execution_mode", "unknown") if isinstance(ds, dict) else getattr(ds, "execution_mode", "unknown")
         routing_counts[mode] = routing_counts.get(mode, 0) + 1
+        if isinstance(ds, dict):
+            ds_id = ds.get("dataset_id")
+            reasoning = ds.get("reasoning")
+        else:
+            ds_id = getattr(ds, "dataset_id", None)
+            reasoning = getattr(ds, "reasoning", None)
         dataset_decisions.append({
-            "dataset_id": getattr(ds, "dataset_id", None),
+            "dataset_id": ds_id,
             "execution_mode": mode,
-            "reasoning": getattr(ds, "reasoning", None),
+            "reasoning": reasoning,
         })
 
     plan = result.plan
