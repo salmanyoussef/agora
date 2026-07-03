@@ -81,12 +81,36 @@ class DatasetSelectorAgent:
         configure_dspy()
         self.module = dspy.ChainOfThought(DatasetSelectorSignature)
 
+    @staticmethod
+    def _extract_json(raw: str) -> str:
+        """Strip markdown code fences and extract JSON object/array."""
+        s = raw.strip()
+        # Strip ```json ... ``` or ``` ... ``` wrappers (common with open-source LLMs)
+        if s.startswith("```"):
+            lines = s.splitlines()
+            # Drop first line (``` or ```json) and last ``` line
+            inner = "\n".join(
+                line for line in lines[1:]
+                if line.strip() != "```"
+            ).rstrip()
+            if inner.endswith("```"):
+                inner = inner[: inner.rfind("```")].rstrip()
+            s = inner.strip()
+        # If still not a JSON object, try to find the first { ... } block
+        if not s.startswith("{"):
+            start = s.find("{")
+            end = s.rfind("}")
+            if start != -1 and end != -1 and end > start:
+                s = s[start: end + 1]
+        return s
+
     def _parse_and_validate(self, raw_output: str) -> tuple[dict, bool]:
         """Parse JSON and validate structure. Returns (parsed, is_valid)."""
+        cleaned = self._extract_json(raw_output or "")
         try:
-            parsed = json.loads(raw_output)
+            parsed = json.loads(cleaned)
         except Exception as e:
-            logger.warning("DatasetSelectorAgent JSON parse failed: %s", e)
+            logger.warning("DatasetSelectorAgent JSON parse failed: %s | raw=%r", e, (raw_output or "")[:300])
             return {"selected_datasets": []}, False
         if not isinstance(parsed, dict):
             logger.warning("DatasetSelectorAgent response is not a JSON object: %s", type(parsed).__name__)

@@ -50,7 +50,7 @@ QUESTIONS = [
      "analytical", "energy"),
 ]
 
-OUT_PATH = Path(__file__).parent.parent.parent.parent.parent / "evaluation" / "eval_results_llama.json"
+OUT_PATH = Path(__file__).parent.parent.parent.parent / "evaluation" / "eval_results_llama.json"
 
 
 def run_query(qid, question, qtype, domain, k=3):
