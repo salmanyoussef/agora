@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     azure_openai_chat_deployment: str = "gpt-5-mini"
     azure_openai_chat_api_version: str = "2024-12-01-preview"
 
+    # Azure OpenAI — LLaMA (OpenAI-compatible endpoint, same API key)
+    azure_llama_endpoint: str = "https://o3miniapi.services.ai.azure.com/openai/v1"
+    azure_llama_deployment: str = "Llama-3.3-70B-Instruct"
+
     # Weaviate
     weaviate_url: str = "http://localhost:8080"
     weaviate_grpc_host: str = "localhost"

@@ -81,6 +81,10 @@ KNOWN_MODEL_PRICING: dict[str, dict[str, float]] = {
         "input_per_1M": 0.25,
         "output_per_1M": 2.00,
     },
+    "Llama-3.3-70B-Instruct": {
+        "input_per_1M": 0.59,
+        "output_per_1M": 0.79,
+    },
 }
 
 
@@ -272,6 +276,38 @@ def configure_dspy() -> None:
         )
     _LM = lm
 
+    dspy.configure(lm=lm)
+    dspy.configure(track_usage=True)
+    _DSPY_CONFIGURED = True
+
+
+def configure_dspy_for_model(
+    model_key: str,
+    api_base: str,
+    api_key: str,
+    api_version: str | None = None,
+) -> None:
+    """Re-configure DSPy with an arbitrary OpenAI-compatible endpoint.
+
+    Used by evaluation scripts to swap the LLM backend (e.g. LLaMA) without
+    touching the main application configuration.  Resets the global flag so a
+    subsequent call to configure_dspy() would also reinitialise.
+    """
+    global _DSPY_CONFIGURED, _LM
+
+    logger.info("Configuring DSPy with model=%s  api_base=%s", model_key, api_base)
+    kwargs: dict = dict(
+        api_key=api_key,
+        api_base=api_base,
+        model_type="chat",
+        temperature=None,
+        max_tokens=settings.openai_chat_max_tokens,
+    )
+    if api_version:
+        kwargs["api_version"] = api_version
+
+    lm = dspy.LM(f"openai/{model_key}", **kwargs)
+    _LM = lm
     dspy.configure(lm=lm)
     dspy.configure(track_usage=True)
     _DSPY_CONFIGURED = True
