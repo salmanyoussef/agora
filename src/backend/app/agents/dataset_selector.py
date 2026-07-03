@@ -197,7 +197,10 @@ class DatasetSelectorAgent:
                 pass
             log_last_lm_call(caller="dataset_selector")
             logger.info("DatasetSelectorAgent DSPy response trace (last call):")
-            dspy.inspect_history(n=1)
+            try:
+                dspy.inspect_history(n=1)
+            except Exception:
+                pass
             log_lm_usage("dataset_selector", usage)
 
             parsed, valid = self._parse_and_validate(last_result.output_json or "{}")
