@@ -1,0 +1,80 @@
+# AGORA reviewer demo — Azure Container App (single app, two containers).
+# Backend is public (ingress :8000); Weaviate is a localhost sidecar (no ingress).
+# Placeholders (__X__) are filled by aca_deploy.sh. Secrets come from --secrets, not this file.
+properties:
+  environmentId: __ENV_ID__
+  configuration:
+    activeRevisionsMode: Single
+    ingress:
+      external: true
+      targetPort: 8000
+      transport: auto
+      allowInsecure: false
+    registries:
+      - server: __ACR_SERVER__
+        username: __ACR_USER__
+        passwordSecretRef: acr-password
+    secrets:
+      - name: acr-password
+        value: __ACR_PASSWORD__
+      - name: azure-openai-key
+        value: __AZURE_OPENAI_KEY__
+      - name: agora-admin-token
+        value: __ADMIN_TOKEN__
+  template:
+    scale:
+      minReplicas: 1
+      maxReplicas: 1
+    volumes:
+      - name: agora-data
+        storageName: agoradata
+        storageType: AzureFile
+    containers:
+      - name: agora-backend
+        image: __ACR_SERVER__/agora-backend:__TAG__
+        resources:
+          cpu: 1.25
+          memory: 2.5Gi
+        volumeMounts:
+          - volumeName: agora-data
+            mountPath: /data
+        env:
+          - name: LLM_PROVIDER
+            value: azure
+          - name: AZURE_OPENAI_ENDPOINT
+            value: __AZURE_OPENAI_ENDPOINT__
+          - name: AZURE_OPENAI_API_KEY
+            secretRef: azure-openai-key
+          - name: AZURE_OPENAI_CHAT_DEPLOYMENT
+            value: gpt-5-mini
+          - name: AZURE_OPENAI_CHAT_API_VERSION
+            value: 2024-12-01-preview
+          - name: AZURE_OPENAI_EMBED_DEPLOYMENT
+            value: text-embedding-3-small
+          - name: AZURE_OPENAI_EMBED_API_VERSION
+            value: 2024-02-01
+          - name: WEAVIATE_URL
+            value: http://localhost:8080
+          - name: WEAVIATE_GRPC_HOST
+            value: localhost
+          - name: WEAVIATE_GRPC_PORT
+            value: "50051"
+          - name: DATASETS_COLLECTION
+            value: Dataset
+          - name: AGORA_DEMO_MODE
+            value: "true"
+          - name: AGORA_RATE_LIMIT
+            value: 3/minute;20/hour;60/day
+          - name: AGORA_MAX_CONCURRENT
+            value: "3"
+          - name: AGORA_COST_CEILING_USD
+            value: "10"
+          - name: AGORA_BUDGET_FILE
+            value: /data/agora_budget.json
+          - name: AGORA_ADMIN_TOKEN
+            secretRef: agora-admin-token
+      - name: agora-weaviate
+        image: __ACR_SERVER__/agora-weaviate:__TAG__
+        resources:
+          cpu: 0.75
+          memory: 1.5Gi

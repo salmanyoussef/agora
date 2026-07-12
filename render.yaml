@@ -47,7 +47,7 @@ services:
       - key: AGORA_MAX_CONCURRENT
         value: "3"
       - key: AGORA_COST_CEILING_USD
-        value: "25"
+        value: "10"
       - key: AGORA_BUDGET_FILE
         value: /data/agora_budget.json
       - key: AGORA_ADMIN_TOKEN

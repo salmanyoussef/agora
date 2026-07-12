@@ -30,7 +30,7 @@ update the release asset.
 - **Cost circuit-breaker** (`app/services/budget.py`): every pipeline run's estimated
   USD cost (existing per-run cost estimation) accumulates in `AGORA_BUDGET_FILE`
   (on the persistent disk, survives restarts). Once `AGORA_COST_CEILING_USD`
-  (default 25) is reached, search requests get a graceful bilingual "budget exhausted"
+  (default 10) is reached, search requests get a graceful bilingual "budget exhausted"
   message. Runs with unknown pricing are charged a $0.02 flat fallback. Check status at
   `GET /budget`; reset by deleting the budget file or raising the ceiling.
 - **Concurrency cap**: at most `AGORA_MAX_CONCURRENT` (default 3) simultaneous pipeline
@@ -60,3 +60,21 @@ update the release asset.
 
 Render dashboard → each service → Settings → **Delete service** (or suspend to keep
 config). Delete the GitHub release asset if the backup should not stay public.
+
+---
+
+## Azure Container Apps (chosen path for the ICSOC demo)
+
+Render blueprint above is kept as a portable alternative; the live demo runs on
+**Azure Container Apps** (free via Azure credits). Topology differs slightly:
+one Container App with **two containers in the same replica** — the FastAPI backend
+(public ingress on :8000) and Weaviate as a **localhost sidecar** (no ingress at all,
+so it is unreachable from outside by construction). The catalogue index is baked into
+the Weaviate image (`src/infra/weaviate-seeded/Dockerfile.aca`, `ADD` of the backup
+tarball) and built in the cloud with ACR Tasks — no local Docker needed.
+
+Reproducible runbook: `src/infra/aca/aca_deploy.sh` + `containerapp.yaml.template`
+(resource group `agora-demo-rg`, region `francecentral`, 2 vCPU / 4 GiB fixed at
+1 replica, Azure Files share mounted at `/data` for the budget counter).
+
+Teardown: `az group delete -n agora-demo-rg --yes` removes everything.

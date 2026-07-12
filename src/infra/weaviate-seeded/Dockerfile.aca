@@ -1,0 +1,11 @@
+# Weaviate pre-seeded with the AGORA catalogue index — ACR Tasks variant.
+# Build context must contain weaviate_backup.tar.gz (tar of Weaviate's data dir);
+# ADD auto-extracts it into the image. Runs as a localhost sidecar of the backend
+# container app — no ingress, never publicly exposed.
+FROM cr.weaviate.io/semitechnologies/weaviate:1.36.0
+ADD weaviate_backup.tar.gz /var/lib/weaviate
+
+ENV PERSISTENCE_DATA_PATH=/var/lib/weaviate
+ENV AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED=true
+ENV QUERY_DEFAULTS_LIMIT=25
+ENV CLUSTER_HOSTNAME=node1
