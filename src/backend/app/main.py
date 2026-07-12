@@ -3,16 +3,21 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.agents.orchestrator import AgentOrchestrator, _stream_run
 from app.pipelines.retrieval import ingest_data_gouv, iter_sync_data_gouv
+from app.services.budget import EXHAUSTED_MESSAGE, budget_tracker
 from app.weaviate.store import WeaviateStore
 
 _log_level = os.environ.get("LOG_LEVEL", "INFO").upper()
@@ -25,7 +30,36 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _client_ip(request: Request) -> str:
+    """Rate-limit key: first hop of X-Forwarded-For when behind a proxy (Render/ACA)."""
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return get_remote_address(request)
+
+
+# Per-IP throttling on the search endpoints (public demo hardening).
+SEARCH_RATE_LIMIT = os.environ.get("AGORA_RATE_LIMIT", "3/minute;20/hour;60/day")
+
+# Cap simultaneous pipeline runs so a burst can't OOM the instance.
+_MAX_CONCURRENT = int(os.environ.get("AGORA_MAX_CONCURRENT", "3") or 3)
+_run_slots = threading.Semaphore(_MAX_CONCURRENT)
+
+# Admin token gates ingestion/debug endpoints when set (always set it in public deploys).
+_ADMIN_TOKEN = os.environ.get("AGORA_ADMIN_TOKEN") or None
+
+limiter = Limiter(key_func=_client_ip)
+
 app = FastAPI(title="Agora — French Open Data Q&A")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def _require_admin(request: Request) -> None:
+    if _ADMIN_TOKEN is None:
+        return  # not configured (local/dev use)
+    if request.headers.get("x-admin-token") != _ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Admin token required")
 
 app.add_middleware(
     CORSMiddleware,
@@ -73,8 +107,15 @@ def health():
     return {"ok": True}
 
 
+@app.get("/budget")
+def budget_status():
+    """Public read-only view of demo budget consumption."""
+    return budget_tracker.status()
+
+
 @app.post("/ingest")
-def ingest(req: IngestRequest):
+def ingest(req: IngestRequest, request: Request):
+    _require_admin(request)
     logger.info(
         "HTTP /ingest called: mode=%s, page=%d, page_size=%d, q=%s, hard_limit=%s",
         req.mode,
@@ -108,8 +149,9 @@ def _sse_ingest_sync(page_size: int, prune_stale: bool):
 
 
 @app.post("/ingest/sync/stream")
-def ingest_sync_stream(req: SyncRequest):
+def ingest_sync_stream(req: SyncRequest, request: Request):
     """Stream a full data.gouv.fr → Weaviate sync via Server-Sent Events."""
+    _require_admin(request)
     logger.info(
         "HTTP /ingest/sync/stream called: page_size=%d, prune_stale=%s",
         req.page_size,
@@ -127,12 +169,18 @@ def ingest_sync_stream(req: SyncRequest):
 
 
 @app.post("/search")
-def search(req: SearchRequest):
-
-    orchestrator = AgentOrchestrator()
-
-    result = orchestrator.run(req.question, k=req.k)
-
+@limiter.limit(SEARCH_RATE_LIMIT)
+def search(req: SearchRequest, request: Request):
+    if budget_tracker.exhausted:
+        raise HTTPException(status_code=503, detail=EXHAUSTED_MESSAGE)
+    if not _run_slots.acquire(blocking=False):
+        raise HTTPException(status_code=429, detail="Demo is busy — please retry in a minute.")
+    try:
+        orchestrator = AgentOrchestrator()
+        result = orchestrator.run(req.question, k=req.k)
+    finally:
+        _run_slots.release()
+    budget_tracker.record_run(getattr(result, "pipeline_cost_usd", None))
     return result.model_dump()
 
 
@@ -142,15 +190,22 @@ def _sse_stream(question: str, k: int, use_only_general_agent: bool | None = Non
     receives GeneratorExit; we close the inner _stream_run generator so
     the pipeline and any held connections are released.
     """
+    if not _run_slots.acquire(blocking=False):
+        yield f"data: {json.dumps({'event': 'error', 'message': 'Demo is busy — please retry in a minute.'})}\n\n"
+        return
     orchestrator = AgentOrchestrator()
     stream_run = _stream_run(orchestrator, question, k=k, use_only_general_agent=use_only_general_agent)
     try:
         for payload in stream_run:
+            if payload.get("event") == "done":
+                response = payload.get("response") or {}
+                budget_tracker.record_run(response.get("pipeline_cost_usd"))
             yield f"data: {json.dumps(payload)}\n\n"
     except GeneratorExit:
         stream_run.close()
         raise
     finally:
+        _run_slots.release()
         try:
             stream_run.close()
         except Exception:
@@ -158,7 +213,8 @@ def _sse_stream(question: str, k: int, use_only_general_agent: bool | None = Non
 
 
 @app.post("/search/stream")
-def search_stream(req: SearchRequest):
+@limiter.limit(SEARCH_RATE_LIMIT)
+def search_stream(req: SearchRequest, request: Request):
     """Stream search progress in real time via Server-Sent Events (SSE).
     Connect with EventSource or fetch with stream; each event is JSON:
     - event: 'status' | 'plan' | 'user_message' | 'technical_repl' | 'evidence' | 'done'
@@ -166,6 +222,10 @@ def search_stream(req: SearchRequest):
     - plan (for plan)
     - response (for done, full AgentResponse as dict)
     """
+    if budget_tracker.exhausted:
+        def _exhausted():
+            yield f"data: {json.dumps({'event': 'error', 'message': EXHAUSTED_MESSAGE})}\n\n"
+        return StreamingResponse(_exhausted(), media_type="text/event-stream")
     return StreamingResponse(
         _sse_stream(req.question, k=req.k, use_only_general_agent=req.use_only_general_agent),
         media_type="text/event-stream",
@@ -177,11 +237,13 @@ def search_stream(req: SearchRequest):
     )
 
 @app.get("/debug/count")
-def debug_count():
+def debug_count(request: Request):
+    _require_admin(request)
     store = WeaviateStore()
     return {"collection": store.collection_name, "count": store.count()}
 
 @app.get("/debug/sample")
-def debug_sample(limit: int = 20):
+def debug_sample(request: Request, limit: int = 20):
+    _require_admin(request)
     store = WeaviateStore()
     return {"collection": store.collection_name, "items": store.sample(limit=limit)}

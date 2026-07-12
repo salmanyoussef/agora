@@ -13,6 +13,7 @@ dependencies = [
   "pydantic-settings>=2.2",
   "pypdf>=4.0",
   "requests>=2.31",
+  "slowapi>=0.1.9",
   "tiktoken>=0.7",
   "uvicorn[standard]>=0.27",
   "weaviate-client>=4.20.1",
@@ -53,4 +54,4 @@ install_windows = "irm https://deno.land/install.ps1 | iex"
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+targe

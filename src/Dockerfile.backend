@@ -1,0 +1,27 @@
+# AGORA backend + frontend — public demo image (build context: src/)
+FROM python:3.10-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl unzip libmagic1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Deno for the Technical agent's sandboxed REPL (DSPy RLM, Deno + Pyodide).
+ENV DENO_INSTALL=/usr/local
+RUN curl -fsSL https://deno.land/install.sh | sh \
+    && deno --version
+
+WORKDIR /app
+
+# Backend at /app, frontend at /frontend (app/main.py resolves ../../frontend -> /frontend)
+COPY backend/ /app/
+COPY frontend/ /frontend/
+
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir ".[rlm]"
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,0 +1,65 @@
+# Render Blueprint — AGORA public reviewer demo (ICSOC 2026)
+# Two services:
+#   * agora-backend  — public web service (FastAPI + frontend + agent pipeline)
+#   * agora-weaviate — PRIVATE service (vector index; never publicly exposed)
+# Secrets (sync: false) are set in the Render dashboard, never committed.
+services:
+  - type: web
+    name: agora-backend
+    runtime: docker
+    plan: standard            # 2 GB RAM (unstructured/torch stack needs headroom)
+    region: frankfurt
+    dockerfilePath: ./src/Dockerfile.backend
+    dockerContext: ./src
+    healthCheckPath: /health
+    autoDeploy: false
+    disk:
+      name: agora-data
+      mountPath: /data
+      sizeGB: 1               # persists cumulative spend counter across restarts/deploys
+    envVars:
+      - key: LLM_PROVIDER
+        value: azure
+      - key: AZURE_OPENAI_ENDPOINT
+        sync: false
+      - key: AZURE_OPENAI_API_KEY
+        sync: false
+      - key: AZURE_OPENAI_CHAT_DEPLOYMENT
+        value: gpt-5-mini
+      - key: AZURE_OPENAI_CHAT_API_VERSION
+        value: 2024-12-01-preview
+      - key: AZURE_OPENAI_EMBED_DEPLOYMENT
+        value: text-embedding-3-small
+      - key: AZURE_OPENAI_EMBED_API_VERSION
+        value: 2024-02-01
+      - key: WEAVIATE_URL
+        value: http://agora-weaviate:8080
+      - key: WEAVIATE_GRPC_HOST
+        value: agora-weaviate
+      - key: WEAVIATE_GRPC_PORT
+        value: "50051"
+      - key: DATASETS_COLLECTION
+        value: Dataset
+      - key: AGORA_DEMO_MODE
+        value: "true"
+      - key: AGORA_RATE_LIMIT
+        value: 3/minute;20/hour;60/day
+      - key: AGORA_MAX_CONCURRENT
+        value: "3"
+      - key: AGORA_COST_CEILING_USD
+        value: "25"
+      - key: AGORA_BUDGET_FILE
+        value: /data/agora_budget.json
+      - key: AGORA_ADMIN_TOKEN
+        generateValue: true
+  - type: pserv
+    name: agora-weaviate
+    runtime: docker
+    plan: standard            # 2 GB RAM for HNSW index of ~73k vectors
+    region: frankfurt
+    dockerfilePath: ./src/infra/weaviate-seeded/Dockerfile
+    dockerContext: ./src/infra/weaviate-seeded
+    autoDeploy: false
+    envVars:
+      - key: SEED_URL
+        sync: false           # URL of weaviate_backup.tar.gz (e.g. GitHub release asset)
