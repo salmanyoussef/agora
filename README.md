@@ -83,10 +83,11 @@ Prototype in `notebooks/`, ship stable pieces in `src/`.
 
 ---
 
-## License
+## Licensing & Commercial Use
 
-AGORA is licensed under the **Apache License, Version 2.0**. 
+AGORA is distributed under a dual-licensing model to balance community innovation with enterprise-grade compliance:
 
-This is a permissive license that allows for free community, academic, and commercial use. However, it provides explicit protections regarding contributor patent grants, patent retaliation defenses, and strict restrictions against using the AGORA project name or trademarks without explicit permission.
+* **Community & Academic Use:** The core orchestration framework is licensed under the **GNU Affero General Public License v3 (AGPL-3.0)**. Any modifications or deployments hosted as a network service must be open-sourced under the same license.
+* **Commercial & Enterprise Use:** For commercial deployments, private cloud installations, or environments requiring custom SLA, security enclaves, or proprietary integrations, a **Commercial Proprietary License** is required.
 
-For full details, please refer to the [LICENSE](./LICENSE) file.
+For commercial licensing inquiries, enterprise support, or custom deployment options, please contact the authors.
