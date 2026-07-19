@@ -1,0 +1,1 @@
+Split of weaviate_backup.tar.gz (pre-embedded catalogue). Reassemble: cat part.* > weaviate_backup.tar.gz && sha256sum -c SHA256SUM. Temporary branch for the ICSOC reviewer demo build; delete after deployment.
