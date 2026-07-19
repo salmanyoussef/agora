@@ -36,7 +36,7 @@ def _env_float(name: str, default: float) -> float:
 class BudgetTracker:
     def __init__(self, ceiling_usd: float | None = None, path: str | None = None):
         self.ceiling_usd = ceiling_usd if ceiling_usd is not None else _env_float(
-            "AGORA_COST_CEILING_USD", 25.0
+            "AGORA_COST_CEILING_USD", 10.0
         )
         self.path = Path(path or os.environ.get("AGORA_BUDGET_FILE", "agora_budget.json"))
         self._lock = threading.Lock()
