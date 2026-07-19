@@ -237,8 +237,8 @@ def search_stream(req: SearchRequest, request: Request):
     )
 
 @app.get("/debug/count")
-def debug_count(request: Request):
-    _require_admin(request)
+def debug_count():
+    # Read-only dataset count; used by the frontend index widget, safe to expose.
     store = WeaviateStore()
     return {"collection": store.collection_name, "count": store.count()}
 
